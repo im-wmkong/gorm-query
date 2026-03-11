@@ -1,6 +1,6 @@
 module github.com/im-wmkong/gorm-query
 
-go 1.18
+go 1.21
 
 require (
 	github.com/dave/jennifer v1.7.1
