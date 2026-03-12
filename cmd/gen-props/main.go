@@ -83,7 +83,7 @@ func parseEnvAndArgs() (string, string, string) {
 
 func loadPackage(goFile, dir string) []*packages.Package {
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax | packages.NeedImports,
+		Mode: packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax | packages.NeedImports | packages.NeedDeps,
 		Dir:  dir,
 	}
 
