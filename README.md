@@ -11,7 +11,6 @@
 ## ✨ 核心特性
 
 - 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `UserProps.Age.Gte(18)`，在编译期拦截字段名拼写错误。
-- 🔗 **优雅的 JOIN 别名支持**：原生支持表别名 `.Alias("u")`，彻底解决连表查询时的 `ambiguous column name` 歧义报错。
 - 📦 **开箱即用的泛型仓储**：提供 `repo.BaseRepository[T]`，一行代码拥有完整的 CRUD 能力。
 - 🎯 **告别臃肿的 Repository**：结合通用 builder 查询构建器，按需动态组合查询条件，无需再为不同业务编写数十个 `FindByXxx` 方法。
 - 🔄 **隐式上下文事务**：基于 `context.Context` 传递事务，Service 层与 Repo 层彻底解耦，再也不用把 `*gorm.DB` 传来传去。
@@ -76,27 +75,7 @@ err := qb.Apply(db.Model(&model.User{})).Find(&users).Error
 
 ## 💡 高级用法
 
-### 1. 解决 JOIN 查询中的字段歧义
-
-当使用 `Joins` 连表时，多张表可能都有 `id` 或 `created_at` 字段。使用 `.Alias()` 可以极其优雅地指定表前缀：
-
-```go
-// 生成 SQL: SELECT * FROM users u JOIN profiles p ON u.id = p.user_id WHERE u.age > 18 AND p.city = 'Beijing'
-qb := query.New().
-    Select(
-        model.UserProps.Alias("u").ID, 
-        model.UserProps.Alias("u").Name
-    ).
-    Joins("JOIN profiles p ON u.id = p.user_id").
-    Where(
-        model.UserProps.Alias("u").Age.Gt(18),
-        model.ProfileProps.Alias("p").City.Eq("Beijing"),
-    )
-var users []model.User
-err := qb.Apply(db.Model(&model.User{})).Find(&users).Error
-```
-
-### 2. 泛型 Repository 与上下文事务 (Context-Aware TX)
+### 1. 泛型 Repository 与上下文事务 (Context-Aware TX)
 
 结合提供的 `db.Client` 和 `repo.BaseRepository`，你可以构建极度整洁的架构：
 
@@ -180,21 +159,7 @@ func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User
 }
 ```
 
-### 3. 查询条件的复用 (防污染)
-
-如果需要基于一个基础查询派生出不同的查询，请使用 `.Clone()` 方法防止切片底层数组的条件污染：
-
-```go
-baseQuery := query.New().Where(UserProps.Status.Eq(1))
-
-// 派生查询 A
-adultsQuery := baseQuery.Clone().Where(UserProps.Age.Gte(18))
-
-// 派生查询 B (不会包含 Age >= 18 的条件)
-minorsQuery := baseQuery.Clone().Where(UserProps.Age.Lt(18))
-```
-
-### 4. 告别臃肿：基于 Builder 的动态仓储查询
+### 2. 告别臃肿：基于 Builder 的动态仓储查询
 
 在传统的开发模式中，为了应对各种业务查询需求，Repository 接口往往会无限膨胀：
 
@@ -234,6 +199,20 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
     
     return users, nil
 }
+```
+
+### 3. 查询条件的复用 (防污染)
+
+如果需要基于一个基础查询派生出不同的查询，请使用 `.Clone()` 方法防止切片底层数组的条件污染：
+
+```go
+baseQuery := query.New().Where(UserProps.Status.Eq(1))
+
+// 派生查询 A
+adultsQuery := baseQuery.Clone().Where(UserProps.Age.Gte(18))
+
+// 派生查询 B (不会包含 Age >= 18 的条件)
+minorsQuery := baseQuery.Clone().Where(UserProps.Age.Lt(18))
 ```
 
 ## 🤝 参与贡献

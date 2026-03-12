@@ -7,6 +7,11 @@ import (
 // Column 代表数据库中的列名
 type Column string
 
+// String 转换为字符串 (Field)
+func (c Column) String() string {
+	return string(c)
+}
+
 // Eq 等于 (Field = Value)
 func (c Column) Eq(val any) Condition {
 	return c.compare("=", val)
@@ -99,42 +104,47 @@ func (c Column) IsNotNull() Condition {
 
 // Desc 降序 (Field DESC) (用于 Order By)
 func (c Column) Desc() string {
-	return string(c) + " DESC"
+	return c.String() + " DESC"
 }
 
 // Asc 升序 (Field ASC) (用于 Order By)
 func (c Column) Asc() string {
-	return string(c) + " ASC"
+	return c.String() + " ASC"
+}
+
+// Table 表名 (Table.Field) (用于 Select)
+func (c Column) Table(name string) Column {
+	return Column(name + "." + c.String())
 }
 
 // As 别名 (Field AS Alias) (用于 Select)
 func (c Column) As(alias string) Column {
-	return Column(string(c) + " AS " + alias)
+	return Column(c.String() + " AS " + alias)
 }
 
 // Sum 求和 (SUM(Field)) (用于 Select)
 func (c Column) Sum() Column {
-	return Column("SUM(" + string(c) + ")")
+	return Column("SUM(" + c.String() + ")")
 }
 
 // Count 计数 (COUNT(Field)) (用于 Select)
 func (c Column) Count() Column {
-	return Column("COUNT(" + string(c) + ")")
+	return Column("COUNT(" + c.String() + ")")
 }
 
 // Avg 平均值 (AVG(Field)) (用于 Select)
 func (c Column) Avg() Column {
-	return Column("AVG(" + string(c) + ")")
+	return Column("AVG(" + c.String() + ")")
 }
 
 // Max 最大值 (MAX(Field)) (用于 Select)
 func (c Column) Max() Column {
-	return Column("MAX(" + string(c) + ")")
+	return Column("MAX(" + c.String() + ")")
 }
 
 // Min 最小值 (MIN(Field)) (用于 Select)
 func (c Column) Min() Column {
-	return Column("MIN(" + string(c) + ")")
+	return Column("MIN(" + c.String() + ")")
 }
 
 func (c Column) compare(op string, val any) Condition {
@@ -149,9 +159,9 @@ func (c Column) clause(suffix string, args ...any) Condition {
 	return func(db *gorm.DB) *gorm.DB {
 		for i, arg := range args {
 			if col, ok := arg.(Column); ok {
-				args[i] = gorm.Expr(string(col))
+				args[i] = gorm.Expr(col.String())
 			}
 		}
-		return db.Where(string(c)+" "+suffix, args...)
+		return db.Where(c.String()+" "+suffix, args...)
 	}
 }

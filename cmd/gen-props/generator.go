@@ -144,19 +144,7 @@ func (g *Generator) generate() {
 		}
 		f.Type().Id(propTypeName).Struct(structFields...)
 
-		// 3. 构建 Alias(alias string) 方法，安全拼接常量
-		f.Func().Params(jen.Id("p").Id(propTypeName)).Id("Alias").Params(jen.Id("alias").String()).Id(propTypeName).Block(
-			jen.Return(jen.Id(propTypeName).Values(jen.DictFunc(func(d jen.Dict) {
-				for _, field := range fields {
-					constName := propTypeName + "_" + field.FieldName
-					d[jen.Id(field.FieldName)] = jen.Qual(queryPkg, "Column").Call(
-						jen.Id("alias").Op("+").Lit(".").Op("+").Id(constName),
-					)
-				}
-			}))),
-		)
-
-		// 4. 声明全局变量，复用常量
+		// 3. 声明全局变量，复用常量
 		f.Var().Id(typeName + "Props").Op("=").Id(propTypeName).Values(jen.DictFunc(func(d jen.Dict) {
 			for _, field := range fields {
 				constName := propTypeName + "_" + field.FieldName

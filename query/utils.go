@@ -5,7 +5,7 @@ import "gorm.io/gorm"
 // unwrap 解析参数
 func unwrap(v any) any {
 	if e, ok := v.(Column); ok {
-		return string(e)
+		return e.String()
 	}
 	return v
 }
