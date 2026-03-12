@@ -27,19 +27,6 @@ type userProps struct {
 	Status    query.Column
 }
 
-func (p userProps) Alias(alias string) userProps {
-	return userProps{
-		Age:       query.Column(alias + "." + userProps_Age),
-		CreatedAt: query.Column(alias + "." + userProps_CreatedAt),
-		DeletedAt: query.Column(alias + "." + userProps_DeletedAt),
-		Email:     query.Column(alias + "." + userProps_Email),
-		ID:        query.Column(alias + "." + userProps_ID),
-		Status:    query.Column(alias + "." + userProps_Status),
-		UpdatedAt: query.Column(alias + "." + userProps_UpdatedAt),
-		UserName:  query.Column(alias + "." + userProps_UserName),
-	}
-}
-
 var UserProps = userProps{
 	Age:       userProps_Age,
 	CreatedAt: userProps_CreatedAt,
