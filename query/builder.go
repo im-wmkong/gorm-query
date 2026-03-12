@@ -1,3 +1,8 @@
+// Package query 提供了强类型的 GORM 查询构建器核心能力。
+//
+// 它通过 Condition 函数式选项模式动态构建查询，支持深拷贝 (Clone) 以防止
+// 基础查询条件被衍生查询污染。它通常与 cmd/gen-props 生成的属性字典配合使用，
+// 为开发者提供极致顺滑、类型安全的链式 SQL 构建体验。
 package query
 
 import (
