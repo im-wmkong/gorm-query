@@ -13,6 +13,7 @@
 - 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `UserProps.Age.Gte(18)`，在编译期拦截字段名拼写错误。
 - 🔗 **优雅的 JOIN 别名支持**：原生支持表别名 `.Alias("u")`，彻底解决连表查询时的 `ambiguous column name` 歧义报错。
 - 📦 **开箱即用的泛型仓储**：提供 `repo.BaseRepository[T]`，一行代码拥有完整的 CRUD 能力。
+- 🎯 **告别臃肿的 Repository**：结合通用 builder 查询构建器，按需动态组合查询条件，无需再为不同业务编写数十个 `FindByXxx` 方法。
 - 🔄 **隐式上下文事务**：基于 `context.Context` 传递事务，Service 层与 Repo 层彻底解耦，再也不用把 `*gorm.DB` 传来传去。
 - 🧬 **零依赖污染**：生成的属性代码轻量纯净，采用私有常量机制，保证重复调用的绝对幂等性。
 
@@ -191,6 +192,48 @@ adultsQuery := baseQuery.Clone().Where(UserProps.Age.Gte(18))
 
 // 派生查询 B (不会包含 Age >= 18 的条件)
 minorsQuery := baseQuery.Clone().Where(UserProps.Age.Lt(18))
+```
+
+### 4. 告别臃肿：基于 Builder 的动态仓储查询
+
+在传统的开发模式中，为了应对各种业务查询需求，Repository 接口往往会无限膨胀：
+
+```go
+// ❌ 传统模式下臃肿的 Repository 接口
+// type UserRepository interface {
+//     FindByName(ctx context.Context, name string) ([]*model.User, error)
+//     FindByAgeGt(ctx context.Context, age int) ([]*model.User, error)
+//     FindByStatusWithPage(ctx context.Context, status, page, size int) ([]*model.User, error)
+//     // ... 以及其他几十个类似的方法
+// }
+```
+
+**GORM Query** 的 `query.Builder` 彻底解决了这个问题。借助通用的查询构建能力，开发者可以在 Service 层自由定制查询条件，并直接传递给泛型仓储。这使得 Repository 层保持极简，不再需要定义任何多余的方法。
+
+```go
+// ✅ 现代模式：极简的 Repository + 强大的 Builder
+func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name string, minAge int) ([]*model.User, error) {
+    // 1. 使用 builder 自由组合查询条件
+    qb := query.New().Where(
+        model.UserProps.Status.Eq(1), // 默认条件
+    )
+
+    // 2. 动态追加条件
+    if name != "" {
+        qb = qb.Where(model.UserProps.Name.Contains(name))
+    }
+    if minAge > 0 {
+        qb = qb.Where(model.UserProps.Age.Gte(minAge))
+    }
+
+    // 3. 直接将 builder 传递给 BaseRepository 的 Find 方法，无需在 repo 新增任何方法！
+    users, err := s.userRepo.Find(ctx, qb)
+    if err != nil {
+        return nil, err
+    }
+    
+    return users, nil
+}
 ```
 
 ## 🤝 参与贡献
