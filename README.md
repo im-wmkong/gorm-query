@@ -20,7 +20,7 @@ It eliminates the fragile "magic strings" in GORM queries through **code generat
 ## 📦 Installation
 
 ```bash
-go get [github.com/im-wmkong/gorm-query](https://github.com/im-wmkong/gorm-query)
+go get github.com/im-wmkong/gorm-query
 ```
 
 ## 🚀 Quick Start
@@ -34,7 +34,7 @@ package model
 
 import "gorm.io/gorm"
 
-//go:generate go run [github.com/im-wmkong/gorm-query/cmd/gen-props@latest](https://github.com/im-wmkong/gorm-query/cmd/gen-props@latest) -type=User
+//go:generate go run github.com/im-wmkong/gorm-query/cmd/gen-props@latest -type=User
 type User struct {
     gorm.Model
     Name   string `gorm:"column:user_name"`
@@ -56,7 +56,7 @@ go generate ./...
 
 ```go
 import (
-    "[github.com/im-wmkong/gorm-query/query](https://github.com/im-wmkong/gorm-query/query)"
+    "github.com/im-wmkong/gorm-query/query"
     // Import your model package
 )
 
@@ -123,8 +123,8 @@ func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, tm
 **Initialization and Injection:**
 ```go
 import (
-    "[github.com/im-wmkong/gorm-query/db](https://github.com/im-wmkong/gorm-query/db)"
-    "[github.com/im-wmkong/gorm-query/repo](https://github.com/im-wmkong/gorm-query/repo)"
+    "github.com/im-wmkong/gorm-query/db"
+    "github.com/im-wmkong/gorm-query/repo"
 )
 
 // 1. Initialize DB Client
