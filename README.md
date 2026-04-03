@@ -34,7 +34,7 @@ package model
 
 import "gorm.io/gorm"
 
-//go:generate go run github.com/im-wmkong/gorm-query/cmd/gen-props@latest -type=User
+//go:generate go run github.com/im-wmkong/gorm-query/cmd/gen-props -type=User
 type User struct {
     gorm.Model
     Name   string `gorm:"column:user_name"`
