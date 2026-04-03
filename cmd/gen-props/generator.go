@@ -125,32 +125,18 @@ func (g *Generator) generate() {
 	queryPkg := "github.com/im-wmkong/gorm-query/query"
 
 	for typeName, fields := range g.data {
-		// 生成小写的结构体名称，例如: userProps
-		propTypeName := strings.ToLower(typeName[:1]) + typeName[1:] + "Props"
-
 		f.Comment(fmt.Sprintf("%sProps defines the fields for %s", typeName, typeName))
 
-		// 1. 批量生成私有常量 (避免字符串硬编码重复)
-		f.Const().DefsFunc(func(grp *jen.Group) {
+		// 直接声明匿名结构体变量，避免额外生成常量和内部类型
+		f.Var().Id(typeName + "Props").Op("=").StructFunc(func(grp *jen.Group) {
 			for _, field := range fields {
-				grp.Id(propTypeName + "_" + field.FieldName).Op("=").Lit(field.ColumnName)
+				grp.Id(field.FieldName).Qual(queryPkg, "Column")
+			}
+		}).CustomFunc(jen.Options{Open: "{", Close: "}", Separator: ",", Multi: true}, func(grp *jen.Group) {
+			for _, field := range fields {
+				grp.Id(field.FieldName).Op(":").Lit(field.ColumnName)
 			}
 		})
-
-		// 2. 构建结构体类型定义
-		var structFields []jen.Code
-		for _, field := range fields {
-			structFields = append(structFields, jen.Id(field.FieldName).Qual(queryPkg, "Column"))
-		}
-		f.Type().Id(propTypeName).Struct(structFields...)
-
-		// 3. 声明全局变量，复用常量
-		f.Var().Id(typeName + "Props").Op("=").Id(propTypeName).Values(jen.DictFunc(func(d jen.Dict) {
-			for _, field := range fields {
-				constName := propTypeName + "_" + field.FieldName
-				d[jen.Id(field.FieldName)] = jen.Id(constName)
-			}
-		}))
 	}
 
 	err := f.Save(g.outputPath)

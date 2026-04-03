@@ -5,18 +5,7 @@ package model
 import query "github.com/im-wmkong/gorm-query/query"
 
 // UserProps defines the fields for User
-const (
-	userProps_ID        = "id"
-	userProps_CreatedAt = "created_at"
-	userProps_UpdatedAt = "updated_at"
-	userProps_DeletedAt = "deleted_at"
-	userProps_UserName  = "user_name"
-	userProps_Email     = "email"
-	userProps_Age       = "age"
-	userProps_Status    = "status"
-)
-
-type userProps struct {
+var UserProps = struct {
 	ID        query.Column
 	CreatedAt query.Column
 	UpdatedAt query.Column
@@ -25,15 +14,13 @@ type userProps struct {
 	Email     query.Column
 	Age       query.Column
 	Status    query.Column
-}
-
-var UserProps = userProps{
-	Age:       userProps_Age,
-	CreatedAt: userProps_CreatedAt,
-	DeletedAt: userProps_DeletedAt,
-	Email:     userProps_Email,
-	ID:        userProps_ID,
-	Status:    userProps_Status,
-	UpdatedAt: userProps_UpdatedAt,
-	UserName:  userProps_UserName,
+}{
+	ID:        "id",
+	CreatedAt: "created_at",
+	UpdatedAt: "updated_at",
+	DeletedAt: "deleted_at",
+	UserName:  "user_name",
+	Email:     "email",
+	Age:       "age",
+	Status:    "status",
 }
