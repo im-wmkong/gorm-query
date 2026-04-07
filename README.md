@@ -71,7 +71,7 @@ qb := query.New().
 
 // Apply to gorm.DB
 var users []model.User
-err := qb.Apply(db.Model(&model.User{})).Find(&users).Error
+err := qb.Apply(db).Find(&users).Error
 ```
 
 ## 💡 Advanced Usage
