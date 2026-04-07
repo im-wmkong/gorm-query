@@ -20,8 +20,8 @@ type Repository[T any] interface {
 	DB(ctx context.Context) *gorm.DB
 	Create(ctx context.Context, entity *T) error
 	Save(ctx context.Context, entity *T) error
-	Update(ctx context.Context, qb *query.Builder, column string, value interface{}) error
-	Updates(ctx context.Context, qb *query.Builder, values interface{}) error
+	Update(ctx context.Context, qb *query.Builder, column string, value any) error
+	Updates(ctx context.Context, qb *query.Builder, values any) error
 	Delete(ctx context.Context, qb *query.Builder) error
 	Find(ctx context.Context, qb *query.Builder) ([]*T, error)
 	First(ctx context.Context, qb *query.Builder) (*T, error)
@@ -64,12 +64,12 @@ func (r *BaseRepository[T]) Save(ctx context.Context, entity *T) error {
 }
 
 // Update 更新记录的指定字段
-func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, column string, value interface{}) error {
+func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, column string, value any) error {
 	return r.buildQuery(ctx, qb).Update(column, value).Error
 }
 
 // Updates 更新记录的多个字段
-func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values interface{}) error {
+func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values any) error {
 	return r.buildQuery(ctx, qb).Updates(values).Error
 }
 
