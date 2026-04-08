@@ -23,34 +23,90 @@ go get github.com/im-wmkong/gorm-query
 
 ## 🚀 快速开始
 
-### 1. 定义你的模型并添加生成指令
+### 1. 定义你的模型
 
-在你的实体模型（Model）文件中引入包，并在结构体上方添加 `//go:generate` 注释：
+先像平常一样定义 GORM 模型：
 
 ```go
 package model
 
 import "gorm.io/gorm"
 
-//go:generate go run github.com/im-wmkong/gorm-query/cmd/gen-props -type=User
 type User struct {
     gorm.Model
-    Name   string `gorm:"column:user_name"`
-    Age    int
-    Status int
+    UserName string `gorm:"column:user_name"`
+    Email    string `gorm:"column:email"`
+    Age      int    `gorm:"column:age"`
+    Status   int    `gorm:"column:status"`
 }
 ```
 
-### 2. 生成强类型属性代码
+### 2. 通过 Go 代码调用生成器
+
+你可以在 Go 代码中通过 `genprops.New().GenerateAll(...)` 调用生成器。
+只要你的项目里有一个可执行的生成入口，就可以把它接入任意工作流，例如：
+
+- `go generate`
+- 一个独立的小 CLI
+- `make generate`
+- 你自己的构建脚本或 CI 流程
+
+例如，可以先写一个很小的生成入口：
+
+```go
+// generate.go
+package model
+
+//go:generate go run /path/to/genprops/main.go
+```
+
+再在入口里调用生成器：
+
+```go
+package main
+
+import (
+    "log"
+
+    "github.com/im-wmkong/gorm-query/example/model"
+    "github.com/im-wmkong/gorm-query/genprops"
+)
+
+func main() {
+    g := genprops.New()
+
+    if err := g.GenerateAll([]any{model.User{}}); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+如果需要，也可以通过 Option 自定义输出行为：
+
+```go
+g := genprops.New(
+    genprops.WithOutputDir("./"),
+    genprops.WithOutputFile("props_gen.go"),
+    genprops.WithPackageName("model"),
+)
+```
+
+也可以直接运行这个入口：
+
+```bash
+go run /path/to/genprops
+```
+
+### 3. 生成强类型属性代码
 
 在项目根目录（或模型所在目录）运行：
 
 ```bash
 go generate ./...
 ```
-*这将会自动生成 `user_gen.go` 文件，包含 `UserProps` 变量。*
+*这只是触发生成的一种方式。只要你的流程能执行这个生成入口，就会生成类似 `props_gen.go` 的文件，其中包含 `UserProps` 变量。*
 
-### 3. 使用 Query Builder
+### 4. 使用 Query Builder
 
 ```go
 import (
@@ -62,7 +118,7 @@ import (
 qb := query.New().
     Where(
         model.UserProps.Age.Gte(18),
-        model.UserProps.Name.Contains("wmkong"),
+        model.UserProps.UserName.Contains("wmkong"),
     ).
     Page(1, 20).
     Order(model.UserProps.ID.Desc())
@@ -184,7 +240,7 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
 
     // 2. 动态追加条件
     if name != "" {
-        qb = qb.Where(model.UserProps.Name.Contains(name))
+        qb = qb.Where(model.UserProps.UserName.Contains(name))
     }
     if minAge > 0 {
         qb = qb.Where(model.UserProps.Age.Gte(minAge))

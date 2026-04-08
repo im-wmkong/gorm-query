@@ -2,8 +2,6 @@ package model
 
 import "gorm.io/gorm"
 
-//go:generate go run github.com/im-wmkong/gorm-query/cmd/gen-props -type=User
-
 // User 定义了用户模型
 type User struct {
 	gorm.Model

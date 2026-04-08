@@ -25,34 +25,89 @@ go get github.com/im-wmkong/gorm-query
 
 ## 🚀 Quick Start
 
-### 1. Define your model and add the generation directive
+### 1. Define your model
 
-Import the package in your entity model file and add the `//go:generate` comment above your struct:
+Create your GORM model as usual:
 
 ```go
 package model
 
 import "gorm.io/gorm"
 
-//go:generate go run github.com/im-wmkong/gorm-query/cmd/gen-props -type=User
 type User struct {
     gorm.Model
-    Name   string `gorm:"column:user_name"`
-    Age    int
-    Status int
+    UserName string `gorm:"column:user_name"`
+    Email    string `gorm:"column:email"`
+    Age      int    `gorm:"column:age"`
+    Status   int    `gorm:"column:status"`
 }
 ```
 
-### 2. Generate strongly-typed property code
+### 2. Invoke the generator from Go code
+
+You can call the generator from Go code with `genprops.New().GenerateAll(...)`.
+As long as your project provides an executable generation entry, you can integrate it into any workflow, such as:
+
+- `go generate`
+- a small standalone CLI
+- a `make generate` command
+- your own build or CI pipeline
+
+For example, you can create a small generation entry like this:
+
+```go
+package model
+
+//go:generate go run /path/to/genprops/main.go
+```
+
+And implement the generator call like this:
+
+```go
+package main
+
+import (
+    "log"
+
+    "github.com/im-wmkong/gorm-query/example/model"
+    "github.com/im-wmkong/gorm-query/genprops"
+)
+
+func main() {
+    g := genprops.New()
+
+    if err := g.GenerateAll([]any{model.User{}}); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+You can also customize output behavior:
+
+```go
+g := genprops.New(
+    genprops.WithOutputDir("./"),
+    genprops.WithOutputFile("props_gen.go"),
+    genprops.WithPackageName("model"),
+)
+```
+
+You can also run the same generation entry directly:
+
+```bash
+go run /path/to/genprops
+```
+
+### 3. Generate strongly-typed property code
 
 Run the following command in your project root (or the directory where the model is located):
 
 ```bash
 go generate ./...
 ```
-*This will automatically generate a `user_gen.go` file containing the `UserProps` variable.*
+*This is just one way to trigger generation. Any workflow that executes your generator entry will generate a file such as `props_gen.go`, containing the `UserProps` variable.*
 
-### 3. Use the Query Builder
+### 4. Use the Query Builder
 
 ```go
 import (
@@ -64,7 +119,7 @@ import (
 qb := query.New().
     Where(
         model.UserProps.Age.Gte(18),
-        model.UserProps.Name.Contains("wmkong"),
+        model.UserProps.UserName.Contains("wmkong"),
     ).
     Page(1, 20).
     Order(model.UserProps.ID.Desc())
@@ -189,7 +244,7 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
 
     // 2. Dynamically append conditions
     if name != "" {
-        qb = qb.Where(model.UserProps.Name.Contains(name))
+        qb = qb.Where(model.UserProps.UserName.Contains(name))
     }
     if minAge > 0 {
         qb = qb.Where(model.UserProps.Age.Gte(minAge))
