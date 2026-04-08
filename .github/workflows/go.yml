@@ -23,7 +23,6 @@ jobs:
     - name: Generate Code
       # 在跑测试前，先确保生成器能正常工作
       run: |
-        go install ./cmd/gen-props
         go generate ./example/...
 
     - name: Test
