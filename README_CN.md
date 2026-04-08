@@ -41,26 +41,9 @@ type User struct {
 }
 ```
 
-### 2. 通过 Go 代码调用生成器
+### 2. 配置并执行代码生成
 
-你可以在 Go 代码中通过 `genprops.New().GenerateAll(...)` 调用生成器。
-只要你的项目里有一个可执行的生成入口，就可以把它接入任意工作流，例如：
-
-- `go generate`
-- 一个独立的小 CLI
-- `make generate`
-- 你自己的构建脚本或 CI 流程
-
-例如，可以先写一个很小的生成入口：
-
-```go
-// generate.go
-package model
-
-//go:generate go run /path/to/genprops/main.go
-```
-
-再在入口里调用生成器：
+创建一个简单的生成脚本（例如放在 `cmd/gen/main.go`），将你需要生成查询属性的模型传入生成器：
 
 ```go
 package main
@@ -68,53 +51,42 @@ package main
 import (
     "log"
 
-    "github.com/im-wmkong/gorm-query/example/model"
+    "your_project_name/model" // 替换为你的实际项目路径
     "github.com/im-wmkong/gorm-query/genprops"
 )
 
 func main() {
-    g := genprops.New()
-
-    if err := g.GenerateAll([]any{model.User{}}); err != nil {
-        log.Fatal(err)
+    // 实例化生成器并传入模型
+    err := genprops.New().GenerateAll([]any{
+        model.User{},
+    })
+    
+    if err != nil {
+        log.Fatalf("generate failed: %v", err)
     }
 }
 ```
 
-如果需要，也可以通过 Option 自定义输出行为：
-
-```go
-g := genprops.New(
-    genprops.WithOutputDir("./"),
-    genprops.WithOutputFile("props_gen.go"),
-    genprops.WithPackageName("model"),
-)
-```
-
-也可以直接运行这个入口：
+在终端直接运行该脚本：
 
 ```bash
-go run /path/to/genprops
+go run cmd/gen/main.go
 ```
+*这将在模型所在目录下自动生成包含 `UserProps` 的代码文件。*
 
-### 3. 生成强类型属性代码
+> **💡 进阶提示：** 你也可以在任意 Go 文件的头部添加 `//go:generate go run cmd/gen/main.go`，之后就能通过在项目根目录运行 `go generate ./...` 将其无缝接入你的标准工作流。
 
-在项目根目录（或模型所在目录）运行：
+### 3. 享受丝滑的强类型查询
 
-```bash
-go generate ./...
-```
-*这只是触发生成的一种方式。只要你的流程能执行这个生成入口，就会生成类似 `props_gen.go` 的文件，其中包含 `UserProps` 变量。*
-
-### 4. 使用 Query Builder
+现在，你可以使用生成的 `UserProps` 配合 Query Builder 进行类型安全的查询了：
 
 ```go
 import (
+    "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
-    // 引入 model package
 )
 
-// 构建查询条件
+// 1. 丝滑地构建查询条件
 qb := query.New().
     Where(
         model.UserProps.Age.Gte(18),
@@ -123,7 +95,7 @@ qb := query.New().
     Page(1, 20).
     Order(model.UserProps.ID.Desc())
 
-// 应用到 gorm.DB
+// 2. 应用到 gorm.DB
 var users []model.User
 err := qb.Apply(db).Find(&users).Error
 ```
