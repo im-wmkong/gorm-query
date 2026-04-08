@@ -6,16 +6,16 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/im-wmkong/gorm-query)](https://goreportcard.com/report/github.com/im-wmkong/gorm-query)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**GORM Query** is a strongly-typed query builder and generic repository library based on GORM.
+**GORM Query** is a strongly-typed query builder and generic repository library built on top of GORM.
 
-It eliminates the fragile "magic strings" in GORM queries through **code generation**, providing a silky-smooth method-chaining experience. It also features built-in enterprise-grade generic repositories and a context-based transaction management solution.
+It eliminates fragile "magic strings" in GORM queries through **code generation**, providing a smooth fluent API experience. It also features enterprise-grade generic repositories and context-based transaction management.
 
 ## ✨ Core Features
 
-- 🛡️ **Strongly-Typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `UserProps.Age.Gte(18)`. Catch field spelling errors at compile time.
-- 📦 **Out-of-the-Box Generic Repository**: Provides `repo.BaseRepository[T]`, granting you full CRUD capabilities with just one line of code.
-- 🎯 **Farewell to Bloated Repositories**: Combined with the generic query builder, you can dynamically compose query conditions on demand. No need to write dozens of `FindByXxx` methods for different business scenarios.
-- 🔄 **Implicit Contextual Transactions**: Pass transactions via `context.Context`, completely decoupling the Service layer from the Repo layer. No more passing `*gorm.DB` around everywhere.
+- 🛡️ **Strongly-typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `UserProps.Age.Gte(18)`. Catch field name typos at compile time.
+- 📦 **Out-of-the-box Generic Repository**: Use `repo.BaseRepository[T]` to gain full CRUD capabilities with a single line of code.
+- 🎯 **Stop Bloating Repositories**: Combine the universal query builder to compose dynamic queries on the fly—no more writing dozens of `FindByXxx` methods.
+- 🔄 **Implicit Context Transactions**: Pass transactions via `context.Context`. Decouple your Service layer from the Repo layer without passing `*gorm.DB` everywhere.
 
 ## 📦 Installation
 
@@ -25,9 +25,9 @@ go get github.com/im-wmkong/gorm-query
 
 ## 🚀 Quick Start
 
-### 1. Define your model
+### 1. Define Your Model
 
-Create your GORM model as usual:
+Define your GORM model as usual:
 
 ```go
 package model
@@ -43,25 +43,9 @@ type User struct {
 }
 ```
 
-### 2. Invoke the generator from Go code
+### 2. Configure and Run Code Generation
 
-You can call the generator from Go code with `genprops.New().GenerateAll(...)`.
-As long as your project provides an executable generation entry, you can integrate it into any workflow, such as:
-
-- `go generate`
-- a small standalone CLI
-- a `make generate` command
-- your own build or CI pipeline
-
-For example, you can create a small generation entry like this:
-
-```go
-package model
-
-//go:generate go run /path/to/genprops/main.go
-```
-
-And implement the generator call like this:
+Create a simple generation script (e.g., at `cmd/gen/main.go`) and pass the models you want to generate properties for:
 
 ```go
 package main
@@ -69,53 +53,42 @@ package main
 import (
     "log"
 
-    "github.com/im-wmkong/gorm-query/example/model"
+    "your_project_name/model" // Replace with your actual project path
     "github.com/im-wmkong/gorm-query/genprops"
 )
 
 func main() {
-    g := genprops.New()
-
-    if err := g.GenerateAll([]any{model.User{}}); err != nil {
-        log.Fatal(err)
+    // Initialize the generator and provide your models
+    err := genprops.New().GenerateAll([]any{
+        model.User{},
+    })
+    
+    if err != nil {
+        log.Fatalf("generate failed: %v", err)
     }
 }
 ```
 
-You can also customize output behavior:
-
-```go
-g := genprops.New(
-    genprops.WithOutputDir("./"),
-    genprops.WithOutputFile("props_gen.go"),
-    genprops.WithPackageName("model"),
-)
-```
-
-You can also run the same generation entry directly:
+Run the script from your terminal:
 
 ```bash
-go run /path/to/genprops
+go run cmd/gen/main.go
 ```
+*This will automatically create a code file (e.g., `props_gen.go`) in your model directory containing the `UserProps` variable.*
 
-### 3. Generate strongly-typed property code
+> **💡 Pro Tip:** You can add `//go:generate go run cmd/gen/main.go` to the top of any Go file and trigger generation using `go generate ./...` in your standard workflow.
 
-Run the following command in your project root (or the directory where the model is located):
+### 3. Enjoy Smooth Strongly-typed Queries
 
-```bash
-go generate ./...
-```
-*This is just one way to trigger generation. Any workflow that executes your generator entry will generate a file such as `props_gen.go`, containing the `UserProps` variable.*
-
-### 4. Use the Query Builder
+Now you can use the generated `UserProps` with the Query Builder for type-safe queries:
 
 ```go
 import (
+    "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
-    // Import your model package
 )
 
-// Build query conditions
+// 1. Build queries fluently
 qb := query.New().
     Where(
         model.UserProps.Age.Gte(18),
@@ -124,18 +97,18 @@ qb := query.New().
     Page(1, 20).
     Order(model.UserProps.ID.Desc())
 
-// Apply to gorm.DB
+// 2. Apply to gorm.DB
 var users []model.User
 err := qb.Apply(db).Find(&users).Error
 ```
 
 ## 💡 Advanced Usage
 
-### 1. Generic Repository and Context-Aware TX
+### 1. Generic Repository & Context-Aware Transactions
 
-By combining the provided `db.Client` and `repo.BaseRepository`, you can build an extremely clean architecture:
+Combine `db.Client` and `repo.BaseRepository` to build a clean architecture:
 
-**Define Repository and Service:**
+**Define Repositories and Service:**
 ```go
 // Define UserRepository
 type UserRepository struct {
@@ -183,66 +156,45 @@ import (
 )
 
 // 1. Initialize DB Client
-// It implements both the db.Connector interface required by the repo and the db.TransactionManager interface required by the service
 dbClient := db.NewClient(gormDB)
-
-// 2. Instantiate UserRepository
+// 2. Instantiate Repositories
 userRepo := NewUserRepository(dbClient)
-
-// 3. Instantiate ProfileRepository
 profileRepo := NewProfileRepository(dbClient)
-
-// 4. Inject into Service
+// 3. Inject into Service
 userService := NewUserService(userRepo, profileRepo, dbClient)
 ```
 
-**Elegantly use transactions in the Service layer:**
+**Elegant Transaction Management in Service Layer:**
 ```go
-// The business code doesn't need to know about the underlying gorm.DB at all
+// Business logic doesn't need to know about gorm.DB
 func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User, profile *model.Profile) error {
-    // Start transaction
+    // Transaction starts here
     return s.tm.Transaction(ctx, func(txCtx context.Context) error {
-        // Automatically uses the transaction connection from txCtx
+        // Automatically uses the transaction stored in txCtx
         if err := s.userRepo.Create(txCtx, user); err != nil {
             return err 
         }
 
         profile.UserID = user.ID
-        // If this fails, the Create above will automatically roll back
+        // If this fails, the previous Create will automatically roll back
         if err := s.profileRepo.Create(txCtx, profile); err != nil {
             return err
         }
-        // All operations are within the same transaction, no manual Commit/Rollback needed
+        
         return nil
     })
 }
 ```
 
-### 2. Say Goodbye to Bloat: Dynamic Repository Queries
+### 2. Dynamic Repository Queries
 
-In traditional development patterns, to meet various business query requirements, Repository interfaces tend to expand infinitely:
-
-```go
-// ❌ Bloated Repository interface in traditional mode
-// type UserRepository interface {
-//     FindByName(ctx context.Context, name string) ([]*model.User, error)
-//     FindByAgeGt(ctx context.Context, age int) ([]*model.User, error)
-//     FindByStatusWithPage(ctx context.Context, status, page, size int) ([]*model.User, error)
-//     // ... and dozens of other similar methods
-// }
-```
-
-**GORM Query**'s `query.Builder` completely solves this problem. Leveraging generic query building capabilities, developers can freely customize query conditions in the Service layer and pass them directly to the generic repository. This keeps the Repository layer extremely minimalist, eliminating the need to define redundant methods.
+Stop inflating your Repository interfaces with dozens of specific methods like `FindByNameAndAge`. Use the `query.Builder` to handle dynamic conditions in the Service layer while keeping your Repository clean.
 
 ```go
-// ✅ Modern mode: Minimalist Repository + Powerful Builder
-func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name string, minAge int) ([]*model.User, error) {
-    // 1. Use the builder to freely compose query conditions
-    qb := query.New().Where(
-        model.UserProps.Status.Eq(1), // Default condition
-    )
+func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]*model.User, error) {
+    // 1. Build dynamic conditions
+    qb := query.New().Where(model.UserProps.Status.Eq(1))
 
-    // 2. Dynamically append conditions
     if name != "" {
         qb = qb.Where(model.UserProps.UserName.Contains(name))
     }
@@ -250,35 +202,30 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
         qb = qb.Where(model.UserProps.Age.Gte(minAge))
     }
 
-    // 3. Pass the builder directly to the BaseRepository's Find method; no need to add any methods in the repo!
-    users, err := s.userRepo.Find(ctx, qb)
-    if err != nil {
-        return nil, err
-    }
-    
-    return users, nil
+    // 2. Pass the builder directly to the generic Find method
+    return s.userRepo.Find(ctx, qb)
 }
 ```
 
-### 3. Reusing Query Conditions (Preventing Pollution)
+### 3. Query Reuse (Cloning)
 
-If you need to derive different queries from a base query, please use the `.Clone()` method to prevent condition pollution of the underlying slice array:
+Use `.Clone()` to derive new queries from a base query without polluting the original:
 
 ```go
 baseQuery := query.New().Where(UserProps.Status.Eq(1))
 
-// Derived query A
-adultsQuery := baseQuery.Clone().Where(UserProps.Age.Gte(18))
+// Derived Query A
+adults := baseQuery.Clone().Where(UserProps.Age.Gte(18))
 
-// Derived query B (will NOT contain the Age >= 18 condition)
-minorsQuery := baseQuery.Clone().Where(UserProps.Age.Lt(18))
+// Derived Query B (Will NOT include Age >= 18 condition)
+minors := baseQuery.Clone().Where(UserProps.Age.Lt(18))
 ```
 
 ## 🤝 Contributing
 
 Issues and Pull Requests are welcome!
 
-After modifying the code, please ensure you run the following commands to check code quality:
+Before submitting, please run:
 ```bash
 make tidy
 make generate
@@ -287,4 +234,4 @@ make test
 
 ## 📄 License
 
-This project is open-sourced under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
