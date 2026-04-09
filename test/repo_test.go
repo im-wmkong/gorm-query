@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/im-wmkong/gorm-query/db"
@@ -16,6 +17,65 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+type stubUserRepository struct {
+	count         int64
+	countErr      error
+	createErr     error
+	countCalls    int
+	createCalls   int
+	lastCountCtx  context.Context
+	lastCreateCtx context.Context
+}
+
+func (s *stubUserRepository) DB(ctx context.Context) *gorm.DB { return nil }
+
+func (s *stubUserRepository) Create(ctx context.Context, entity *model.User) error {
+	s.createCalls++
+	s.lastCreateCtx = ctx
+	return s.createErr
+}
+
+func (s *stubUserRepository) Save(ctx context.Context, entity *model.User) error { return nil }
+
+func (s *stubUserRepository) Update(ctx context.Context, qb *query.Builder, column string, value any) error {
+	return nil
+}
+
+func (s *stubUserRepository) Updates(ctx context.Context, qb *query.Builder, values any) error { return nil }
+
+func (s *stubUserRepository) Delete(ctx context.Context, qb *query.Builder) error { return nil }
+
+func (s *stubUserRepository) Find(ctx context.Context, qb *query.Builder) ([]*model.User, error) {
+	return nil, nil
+}
+
+func (s *stubUserRepository) First(ctx context.Context, qb *query.Builder) (*model.User, error) {
+	return nil, nil
+}
+
+func (s *stubUserRepository) Count(ctx context.Context, qb *query.Builder) (int64, error) {
+	s.countCalls++
+	s.lastCountCtx = ctx
+	return s.count, s.countErr
+}
+
+type stubTransactionManager struct {
+	txCtx  context.Context
+	txErr  error
+	called int
+}
+
+func (s *stubTransactionManager) Transaction(ctx context.Context, fn func(context.Context) error) error {
+	s.called++
+	if s.txErr != nil {
+		return s.txErr
+	}
+	if s.txCtx != nil {
+		return fn(s.txCtx)
+	}
+	return fn(ctx)
+}
 
 // TestCreateUsers 创建用户测试 (独立测试，不使用 setupTest 的默认数据，而是手动验证创建过程)
 func TestCreateUsers(t *testing.T) {
@@ -176,6 +236,61 @@ func TestCreateUser(t *testing.T) {
 	err = svc.CreateUser(ctx, duplicateUser)
 	require.Error(t, err)
 	assert.Equal(t, service.ErrUserAlreadyExists, err)
+}
+
+func TestCreateUser_ErrorPaths(t *testing.T) {
+	t.Run("count error should propagate", func(t *testing.T) {
+		repo := &stubUserRepository{countErr: errors.New("count failed")}
+		tm := &stubTransactionManager{}
+		svc := service.NewUserService(repo, tm)
+
+		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
+		require.Error(t, err)
+		assert.EqualError(t, err, "count failed")
+		assert.Equal(t, 1, tm.called)
+		assert.Equal(t, 1, repo.countCalls)
+		assert.Equal(t, 0, repo.createCalls)
+	})
+
+	t.Run("duplicate user should not create record", func(t *testing.T) {
+		repo := &stubUserRepository{count: 1}
+		tm := &stubTransactionManager{}
+		svc := service.NewUserService(repo, tm)
+
+		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
+		require.ErrorIs(t, err, service.ErrUserAlreadyExists)
+		assert.Equal(t, 1, tm.called)
+		assert.Equal(t, 1, repo.countCalls)
+		assert.Equal(t, 0, repo.createCalls)
+	})
+
+	t.Run("create error should rollback through transaction context", func(t *testing.T) {
+		txCtx := context.WithValue(context.Background(), struct{}{}, "tx")
+		repo := &stubUserRepository{createErr: errors.New("create failed")}
+		tm := &stubTransactionManager{txCtx: txCtx}
+		svc := service.NewUserService(repo, tm)
+
+		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
+		require.Error(t, err)
+		assert.EqualError(t, err, "create failed")
+		assert.Equal(t, 1, repo.countCalls)
+		assert.Equal(t, 1, repo.createCalls)
+		assert.Same(t, txCtx, repo.lastCountCtx)
+		assert.Same(t, txCtx, repo.lastCreateCtx)
+	})
+
+	t.Run("transaction manager error should short circuit", func(t *testing.T) {
+		repo := &stubUserRepository{}
+		tm := &stubTransactionManager{txErr: errors.New("transaction failed")}
+		svc := service.NewUserService(repo, tm)
+
+		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
+		require.Error(t, err)
+		assert.EqualError(t, err, "transaction failed")
+		assert.Equal(t, 1, tm.called)
+		assert.Equal(t, 0, repo.countCalls)
+		assert.Equal(t, 0, repo.createCalls)
+	})
 }
 
 // TestUpdate 测试 Update

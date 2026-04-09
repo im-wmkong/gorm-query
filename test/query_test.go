@@ -67,6 +67,24 @@ func TestQuery_HasSuffix(t *testing.T) {
 	assert.Equal(t, "Charlie", usersSuffix[0].UserName)
 }
 
+// TestQuery_Contains_NotContains 测试 Contains 和 NotContains 辅助方法
+func TestQuery_Contains_NotContains(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	qContains := query.New().Where(model.UserProps.UserName.Contains("li"))
+	usersContains, err := repo.Find(ctx, qContains)
+	require.NoError(t, err)
+	require.Len(t, usersContains, 2)
+	assert.Equal(t, "Alice", usersContains[0].UserName)
+	assert.Equal(t, "Charlie", usersContains[1].UserName)
+
+	qNotContains := query.New().Where(model.UserProps.UserName.NotContains("a"))
+	usersNotContains, err := repo.Find(ctx, qNotContains)
+	require.NoError(t, err)
+	require.Len(t, usersNotContains, 1)
+	assert.Equal(t, "Bob", usersNotContains[0].UserName)
+}
+
 // TestQuery_NotLike 测试查询功能 - NotLike
 func TestQuery_NotLike(t *testing.T) {
 	ctx, _, repo := setupTest(t)
@@ -299,6 +317,33 @@ func TestQuery_Or(t *testing.T) {
 	require.Len(t, usersOr, 2)
 }
 
+// TestQuery_Clone 确保克隆后的 Builder 不会污染原始查询
+func TestQuery_Clone(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	base := query.New().Where(model.UserProps.Status.Eq(1))
+	derived := base.Clone().Where(model.UserProps.UserName.Eq("Alice"))
+
+	baseUsers, err := repo.Find(ctx, base)
+	require.NoError(t, err)
+	require.Len(t, baseUsers, 5)
+
+	derivedUsers, err := repo.Find(ctx, derived)
+	require.NoError(t, err)
+	require.Len(t, derivedUsers, 1)
+	assert.Equal(t, "Alice", derivedUsers[0].UserName)
+}
+
+// TestQuery_EmptyNestedConditions 测试空 Or/Not 不会追加额外条件
+func TestQuery_EmptyNestedConditions(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	q := query.New().Where(model.UserProps.Status.Eq(1)).Or().Not()
+	users, err := repo.Find(ctx, q)
+	require.NoError(t, err)
+	require.Len(t, users, 5)
+}
+
 // TestQuery_Not 测试查询功能 - Not
 func TestQuery_Not(t *testing.T) {
 	ctx, _, repo := setupTest(t)
@@ -489,6 +534,13 @@ func TestCoverageSupplement(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, uOmit.Email)
 
+	// 2.1 Omit Invalid Type (should gracefully degrade)
+	qOmitInvalid := query.New().Omit(123).Where(model.UserProps.UserName.Eq("Alice"))
+	uOmitInvalid, err := repo.First(ctx, qOmitInvalid)
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", uOmitInvalid.UserName)
+	assert.Equal(t, "alice@example.com", uOmitInvalid.Email)
+
 	// 3. Order Invalid Type (should be ignored)
 	qOrder := query.New().Order(123).Where(model.UserProps.UserName.Eq("Alice"))
 	uOrder, err := repo.First(ctx, qOrder)
@@ -605,4 +657,29 @@ func TestQuery_Select_Helpers(t *testing.T) {
 	userSum, err := repo.First(ctx, qSum)
 	require.NoError(t, err)
 	assert.Equal(t, 150, userSum.Age)
+
+	// Count ID
+	qCount := query.New().
+		Select(model.UserProps.ID.Count().As("age"))
+
+	userCount, err := repo.First(ctx, qCount)
+	require.NoError(t, err)
+	assert.Equal(t, 5, userCount.Age)
+
+	// Avg Age
+	qAvg := query.New().
+		Select(model.UserProps.Age.Avg().As("age"))
+
+	userAvg, err := repo.First(ctx, qAvg)
+	require.NoError(t, err)
+	assert.Equal(t, 30, userAvg.Age)
+
+	// Table helper
+	qTable := query.New().
+		Select(model.UserProps.UserName.Table("users").As("user_name")).
+		Where(model.UserProps.UserName.Eq("Alice"))
+
+	userTable, err := repo.First(ctx, qTable)
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", userTable.UserName)
 }
