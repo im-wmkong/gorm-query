@@ -19,21 +19,25 @@ func Values(args []any) []any {
 	return slices.Map(args, Value)
 }
 
-// ValueAs 解析参数为指定类型
-func ValueAs[T any](v any) T {
-	return As[T](Value(v))
-}
-
-// ValuesAs 解析参数列表为指定类型
-func ValuesAs[T any](args []any) []T {
-	return slices.Map(args, ValueAs[T])
-}
-
-// As 转换值为指定类型，默认值为零值
-func As[T any](value any) T {
-	if val, ok := value.(T); ok {
+// ValueTo 解析参数为指定类型
+func ValueTo[T any](v any) T {
+	if val, ok := Value(v).(T); ok {
 		return val
 	}
 	var zero T
 	return zero
+}
+
+// ValuesTo 解析参数列表为指定类型
+func ValuesTo[T any](args []any) []T {
+	return slices.Map(args, ValueTo[T])
+}
+
+// ToStringMap 转换 map[K]V 到 map[string]V
+func ToStringMap[K ~string, V any](values map[K]V) map[string]V {
+	result := make(map[string]V, len(values))
+	for k, v := range values {
+		result[string(k)] = v
+	}
+	return result
 }

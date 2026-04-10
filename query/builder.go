@@ -69,7 +69,7 @@ func (b *Builder) Select(query any, args ...any) *Builder {
 // Omit 忽略字段
 func (b *Builder) Omit(columns ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Omit(cast.ValuesAs[string](columns)...)
+		return db.Omit(cast.ValuesTo[string](columns)...)
 	})
 }
 
@@ -90,7 +90,7 @@ func (b *Builder) Preload(query string, args ...any) *Builder {
 // Group 分组
 func (b *Builder) Group(name any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Group(cast.ValueAs[string](name))
+		return db.Group(cast.ValueTo[string](name))
 	})
 }
 

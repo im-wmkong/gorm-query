@@ -39,7 +39,7 @@ func (s *stubUserRepository) Create(ctx context.Context, entity *model.User) err
 
 func (s *stubUserRepository) Save(ctx context.Context, entity *model.User) error { return nil }
 
-func (s *stubUserRepository) Update(ctx context.Context, qb *query.Builder, column string, value any) error {
+func (s *stubUserRepository) Update(ctx context.Context, qb *query.Builder, column query.Column, value any) error {
 	return nil
 }
 
@@ -303,7 +303,7 @@ func TestUpdate(t *testing.T) {
 
 	// 更新 Alice 的 Age 为 26
 	q := query.New().Where(model.UserProps.UserName.Eq("Alice"))
-	err := repo.Update(ctx, q, "age", 26)
+	err := repo.Update(ctx, q, model.UserProps.Age, 26)
 	require.NoError(t, err)
 
 	// 验证
@@ -318,9 +318,9 @@ func TestUpdates(t *testing.T) {
 
 	// 更新 Bob 的 Age 和 Status
 	q := query.New().Where(model.UserProps.UserName.Eq("Bob"))
-	updates := map[string]interface{}{
-		"age":    31,
-		"status": 2,
+	updates := map[query.Column]interface{}{
+		model.UserProps.Age:    31,
+		model.UserProps.Status: 2,
 	}
 	err := repo.Updates(ctx, q, updates)
 	require.NoError(t, err)

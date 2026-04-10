@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/im-wmkong/gorm-query/db"
+	"github.com/im-wmkong/gorm-query/internal/cast"
 	"github.com/im-wmkong/gorm-query/query"
 
 	"gorm.io/gorm"
@@ -20,7 +21,7 @@ type Repository[T any] interface {
 	DB(ctx context.Context) *gorm.DB
 	Create(ctx context.Context, entity *T) error
 	Save(ctx context.Context, entity *T) error
-	Update(ctx context.Context, qb *query.Builder, column string, value any) error
+	Update(ctx context.Context, qb *query.Builder, column query.Column, value any) error
 	Updates(ctx context.Context, qb *query.Builder, values any) error
 	Delete(ctx context.Context, qb *query.Builder) error
 	Find(ctx context.Context, qb *query.Builder) ([]*T, error)
@@ -64,12 +65,15 @@ func (r *BaseRepository[T]) Save(ctx context.Context, entity *T) error {
 }
 
 // Update 更新记录的指定字段
-func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, column string, value any) error {
-	return r.buildQuery(ctx, qb).Update(column, value).Error
+func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, column query.Column, value any) error {
+	return r.buildQuery(ctx, qb).Update(column.String(), value).Error
 }
 
 // Updates 更新记录的多个字段
 func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values any) error {
+	if mapVals, ok := values.(map[query.Column]any); ok {
+		values = cast.ToStringMap(mapVals)
+	}
 	return r.buildQuery(ctx, qb).Updates(values).Error
 }
 
