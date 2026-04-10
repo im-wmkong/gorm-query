@@ -6,6 +6,8 @@
 package query
 
 import (
+	"github.com/im-wmkong/gorm-query/internal/cast"
+	"github.com/im-wmkong/gorm-query/internal/gormx"
 	"gorm.io/gorm"
 )
 
@@ -60,49 +62,49 @@ func (b *Builder) Not(conds ...Condition) *Builder {
 // Select 指定查询字段
 func (b *Builder) Select(query any, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Select(unwrap(query), unwraps(args)...)
+		return db.Select(cast.Value(query), cast.Values(args)...)
 	})
 }
 
 // Omit 忽略字段
 func (b *Builder) Omit(columns ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Omit(tos[string](columns)...)
+		return db.Omit(cast.ValuesAs[string](columns)...)
 	})
 }
 
 // Joins 连接查询
 func (b *Builder) Joins(query string, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Joins(query, unwraps(args)...)
+		return db.Joins(query, cast.Values(args)...)
 	})
 }
 
 // Preload 预加载关联
 func (b *Builder) Preload(query string, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Preload(query, unwraps(args)...)
+		return db.Preload(query, cast.Values(args)...)
 	})
 }
 
 // Group 分组
 func (b *Builder) Group(name any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Group(to[string](name))
+		return db.Group(cast.ValueAs[string](name))
 	})
 }
 
 // Having 分组后过滤
 func (b *Builder) Having(query any, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Having(unwrap(query), unwraps(args)...)
+		return db.Having(cast.Value(query), cast.Values(args)...)
 	})
 }
 
 // Order 排序
 func (b *Builder) Order(col any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Order(unwrap(col))
+		return db.Order(cast.Value(col))
 	})
 }
 
@@ -138,7 +140,7 @@ func (b *Builder) Offset(offset int) *Builder {
 // Distinct 去重
 func (b *Builder) Distinct(args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Distinct(unwraps(args)...)
+		return db.Distinct(cast.Values(args)...)
 	})
 }
 
@@ -162,7 +164,7 @@ func (b *Builder) nested(conds []Condition, applier func(db, nested *gorm.DB) *g
 	}
 
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return applier(db, buildNested(db, conds))
+		return applier(db, gormx.BuildNested(db, conds))
 	})
 }
 

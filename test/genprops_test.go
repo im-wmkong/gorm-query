@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	_ "unsafe"
 
 	"github.com/im-wmkong/gorm-query/example/model"
 	"github.com/im-wmkong/gorm-query/genprops"
@@ -14,9 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm/schema"
 )
-
-//go:linkname linkedDetectPackageName github.com/im-wmkong/gorm-query/genprops.detectPackageName
-func linkedDetectPackageName(dir string) (string, error)
 
 type localGenPropsModel struct {
 	ID uint
@@ -226,45 +222,5 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		).GenerateAll([]any{&model.User{}})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "render failed")
-	})
-}
-
-func TestDetectPackageName(t *testing.T) {
-	t.Run("finds package after comments and blank lines", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "model.go"), []byte("// comment\n\npackage sample\n"), 0644))
-
-		pkg, err := linkedDetectPackageName(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "sample", pkg)
-	})
-
-	t.Run("skips test files broken links and invalid go files", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "helper_test.go"), []byte("package ignored\n"), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("plain text"), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "broken.go"), []byte("var x = 1\n"), 0644))
-		require.NoError(t, os.Symlink(filepath.Join(dir, "missing.go"), filepath.Join(dir, "missing_link.go")))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "real.go"), []byte("package actual\n"), 0644))
-
-		pkg, err := linkedDetectPackageName(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "actual", pkg)
-	})
-
-	t.Run("returns empty when no package exists", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "broken.go"), []byte("var x = 1\n"), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "helper_test.go"), []byte("package ignored\n"), 0644))
-
-		pkg, err := linkedDetectPackageName(dir)
-		require.NoError(t, err)
-		assert.Empty(t, pkg)
-	})
-
-	t.Run("returns error for missing dir", func(t *testing.T) {
-		pkg, err := linkedDetectPackageName(filepath.Join(t.TempDir(), "missing"))
-		require.Error(t, err)
-		assert.Empty(t, pkg)
 	})
 }

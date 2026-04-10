@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/im-wmkong/gorm-query/db"
@@ -42,7 +43,9 @@ func (s *stubUserRepository) Update(ctx context.Context, qb *query.Builder, colu
 	return nil
 }
 
-func (s *stubUserRepository) Updates(ctx context.Context, qb *query.Builder, values any) error { return nil }
+func (s *stubUserRepository) Updates(ctx context.Context, qb *query.Builder, values any) error {
+	return nil
+}
 
 func (s *stubUserRepository) Delete(ctx context.Context, qb *query.Builder) error { return nil }
 
@@ -80,7 +83,8 @@ func (s *stubTransactionManager) Transaction(ctx context.Context, fn func(contex
 // TestCreateUsers 创建用户测试 (独立测试，不使用 setupTest 的默认数据，而是手动验证创建过程)
 func TestCreateUsers(t *testing.T) {
 	// 设置新的 DB
-	gormDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	dbPath := filepath.Join(t.TempDir(), "create-users.db")
+	gormDB, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Error),
 	})
 	require.NoError(t, err)

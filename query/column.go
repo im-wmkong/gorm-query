@@ -1,11 +1,15 @@
 package query
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 )
 
 // Column 代表数据库中的列名
 type Column string
+
+var _ fmt.Stringer = (*Column)(nil)
 
 // String 转换为字符串 (Field)
 func (c Column) String() string {

@@ -15,6 +15,8 @@ import (
 	"sync"
 
 	"github.com/dave/jennifer/jen"
+	"github.com/im-wmkong/gorm-query/internal/fsx"
+	"github.com/im-wmkong/gorm-query/internal/reflectx"
 	"gorm.io/gorm/schema"
 )
 
@@ -40,11 +42,11 @@ func (g *Generator) GenerateAll(models []any) error {
 	// 确定 packageName
 	pkgName := g.cfg.packageName
 	if pkgName == "" {
-		pkgName = getPkgName(models[0])
+		pkgName = reflectx.PackageName(models[0])
 
 		// 自动推导时校验同包
 		for _, m := range models {
-			if getPkgName(m) != pkgName {
+			if reflectx.PackageName(m) != pkgName {
 				return fmt.Errorf("all models must be in the same package or explicitly set WithPackageName")
 			}
 		}
@@ -56,7 +58,7 @@ func (g *Generator) GenerateAll(models []any) error {
 	}
 
 	// 检测目录已有 package
-	detectedPkg, err := detectPackageName(g.cfg.outputDir)
+	detectedPkg, err := fsx.PackageNameFromDir(g.cfg.outputDir)
 	if err != nil {
 		return fmt.Errorf("detect package failed: %w", err)
 	}
