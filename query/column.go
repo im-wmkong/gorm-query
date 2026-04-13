@@ -126,6 +126,11 @@ func (c Column) As(alias string) Column {
 	return Column(c.String() + " AS " + alias)
 }
 
+// Distinct 去重 (DISTINCT Field) (用于 Select)
+func (c Column) Distinct() Column {
+	return Column("DISTINCT " + c.String())
+}
+
 // Sum 求和 (SUM(Field)) (用于 Select)
 func (c Column) Sum() Column {
 	return Column("SUM(" + c.String() + ")")

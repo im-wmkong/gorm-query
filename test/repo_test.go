@@ -20,13 +20,14 @@ import (
 )
 
 type stubUserRepository struct {
-	count         int64
-	countErr      error
-	createErr     error
-	countCalls    int
-	createCalls   int
-	lastCountCtx  context.Context
-	lastCreateCtx context.Context
+	count          int64
+	countErr       error
+	createErr      error
+	createBatchErr error
+	countCalls     int
+	createCalls    int
+	lastCountCtx   context.Context
+	lastCreateCtx  context.Context
 }
 
 func (s *stubUserRepository) DB(ctx context.Context) *gorm.DB { return nil }
@@ -39,15 +40,23 @@ func (s *stubUserRepository) Create(ctx context.Context, entity *model.User) err
 
 func (s *stubUserRepository) Save(ctx context.Context, entity *model.User) error { return nil }
 
-func (s *stubUserRepository) Update(ctx context.Context, qb *query.Builder, column query.Column, value any) error {
-	return nil
+func (s *stubUserRepository) CreateInBatches(ctx context.Context, entities []*model.User, batchSize int) (int64, error) {
+	s.createCalls++
+	s.lastCreateCtx = ctx
+	return int64(len(entities)), s.createBatchErr
 }
 
-func (s *stubUserRepository) Updates(ctx context.Context, qb *query.Builder, values any) error {
-	return nil
+func (s *stubUserRepository) Update(ctx context.Context, qb *query.Builder, column query.Column, value any) (int64, error) {
+	return 0, nil
 }
 
-func (s *stubUserRepository) Delete(ctx context.Context, qb *query.Builder) error { return nil }
+func (s *stubUserRepository) Updates(ctx context.Context, qb *query.Builder, values any) (int64, error) {
+	return 0, nil
+}
+
+func (s *stubUserRepository) Delete(ctx context.Context, qb *query.Builder) (int64, error) {
+	return 0, nil
+}
 
 func (s *stubUserRepository) Find(ctx context.Context, qb *query.Builder) ([]*model.User, error) {
 	return nil, nil
@@ -57,10 +66,22 @@ func (s *stubUserRepository) First(ctx context.Context, qb *query.Builder) (*mod
 	return nil, nil
 }
 
+func (s *stubUserRepository) Take(ctx context.Context, qb *query.Builder) (*model.User, error) {
+	return nil, nil
+}
+
+func (s *stubUserRepository) Last(ctx context.Context, qb *query.Builder) (*model.User, error) {
+	return nil, nil
+}
+
 func (s *stubUserRepository) Count(ctx context.Context, qb *query.Builder) (int64, error) {
 	s.countCalls++
 	s.lastCountCtx = ctx
 	return s.count, s.countErr
+}
+
+func (s *stubUserRepository) Pluck(ctx context.Context, qb *query.Builder, column query.Column, dest any) error {
+	return nil
 }
 
 type stubTransactionManager struct {
@@ -172,7 +193,9 @@ func TestGetByID(t *testing.T) {
 	user999, err := repo.First(ctx, qID999)
 
 	require.Error(t, err)
-	require.Nil(t, user999)
+	require.NotNil(t, user999)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Zero(t, user999.ID)
 }
 
 // TestDelete 测试删除
@@ -185,8 +208,9 @@ func TestDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	// 删除 Alice
-	err = repo.Delete(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
+	rowsAffected, err := repo.Delete(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
 	require.NoError(t, err)
+	assert.Equal(t, int64(1), rowsAffected)
 
 	// 验证 Alice 已删除
 	_, err = repo.First(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
@@ -195,8 +219,9 @@ func TestDelete(t *testing.T) {
 	// 2. 批量删除 (删除所有剩余年龄 > 30 的用户)
 	// 剩余: Bob(30), Charlie(35), David(20), admin(40)
 	// Age > 30: Charlie(35), admin(40)
-	err = repo.Delete(ctx, query.New().Where(model.UserProps.Age.Gt(30)))
+	rowsAffected, err = repo.Delete(ctx, query.New().Where(model.UserProps.Age.Gt(30)))
 	require.NoError(t, err)
+	assert.Equal(t, int64(2), rowsAffected)
 
 	// 验证
 	remaining, err := repo.Find(ctx, query.New())
@@ -303,8 +328,9 @@ func TestUpdate(t *testing.T) {
 
 	// 更新 Alice 的 Age 为 26
 	q := query.New().Where(model.UserProps.UserName.Eq("Alice"))
-	err := repo.Update(ctx, q, model.UserProps.Age, 26)
+	rowsAffected, err := repo.Update(ctx, q, model.UserProps.Age, 26)
 	require.NoError(t, err)
+	assert.Equal(t, int64(1), rowsAffected)
 
 	// 验证
 	alice, err := repo.First(ctx, q)
@@ -322,8 +348,9 @@ func TestUpdates(t *testing.T) {
 		model.UserProps.Age:    31,
 		model.UserProps.Status: 2,
 	}
-	err := repo.Updates(ctx, q, updates)
+	rowsAffected, err := repo.Updates(ctx, q, updates)
 	require.NoError(t, err)
+	assert.Equal(t, int64(1), rowsAffected)
 
 	// 验证
 	bob, err := repo.First(ctx, q)
@@ -354,4 +381,61 @@ func TestSave(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 36, charlieNew.Age)
 	assert.Equal(t, 0, charlieNew.Status)
+}
+
+func TestCreateInBatches(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	users := []*model.User{
+		{
+			UserName: "Eve",
+			Email:    "eve@example.com",
+			Age:      22,
+			Status:   1,
+		},
+		{
+			UserName: "Frank",
+			Email:    "frank@example.com",
+			Age:      28,
+			Status:   1,
+		},
+	}
+
+	rowsAffected, err := repo.CreateInBatches(ctx, users, 1)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), rowsAffected)
+
+	count, err := repo.Count(ctx, query.New().Where(model.UserProps.UserName.In([]string{"Eve", "Frank"})))
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), count)
+}
+
+func TestTakeAndLast(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	taken, err := repo.Take(ctx, query.New().Where(model.UserProps.UserName.Eq("Charlie")))
+	require.NoError(t, err)
+	require.NotNil(t, taken)
+	assert.Equal(t, "Charlie", taken.UserName)
+
+	last, err := repo.Last(ctx, query.New())
+	require.NoError(t, err)
+	require.NotNil(t, last)
+	assert.Equal(t, "admin", last.UserName)
+
+	notFound, err := repo.Take(ctx, query.New().Where(model.UserProps.UserName.Eq("Nobody")))
+	require.Error(t, err)
+	require.NotNil(t, notFound)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Zero(t, notFound.ID)
+}
+
+func TestPluck(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	var names []string
+	err := repo.Pluck(ctx, query.New().Order(model.UserProps.ID), model.UserProps.UserName, &names)
+	require.NoError(t, err)
+	require.Len(t, names, 5)
+	assert.Equal(t, []string{"Alice", "Bob", "Charlie", "David", "admin"}, names)
 }

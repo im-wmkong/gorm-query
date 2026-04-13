@@ -674,6 +674,28 @@ func TestQuery_Select_Helpers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 30, userAvg.Age)
 
+	// Distinct helper
+	err = repo.Create(ctx, &model.User{
+		UserName: "Frank",
+		Email:    "frank@example.com",
+		Age:      25,
+		Status:   1,
+	})
+	require.NoError(t, err)
+
+	qDistinct := query.New().
+		Select(model.UserProps.Age.Distinct().As("age")).
+		Order(model.UserProps.Age)
+
+	usersDistinct, err := repo.Find(ctx, qDistinct)
+	require.NoError(t, err)
+	require.Len(t, usersDistinct, 5)
+	assert.Equal(t, 20, usersDistinct[0].Age)
+	assert.Equal(t, 25, usersDistinct[1].Age)
+	assert.Equal(t, 30, usersDistinct[2].Age)
+	assert.Equal(t, 35, usersDistinct[3].Age)
+	assert.Equal(t, 40, usersDistinct[4].Age)
+
 	// Table helper
 	qTable := query.New().
 		Select(model.UserProps.UserName.Table("users").As("user_name")).
