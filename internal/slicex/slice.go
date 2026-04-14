@@ -1,4 +1,4 @@
-package slices
+package slicex
 
 func Map[I any, O any](args []I, transform func(I) O) []O {
 	if args == nil {

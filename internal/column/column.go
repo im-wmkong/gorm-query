@@ -1,9 +1,9 @@
-package cast
+package column
 
 import (
 	"fmt"
 
-	"github.com/im-wmkong/gorm-query/internal/slices"
+	"github.com/im-wmkong/gorm-query/internal/slicex"
 )
 
 // Value 解析参数
@@ -16,7 +16,7 @@ func Value(v any) any {
 
 // Values 解析参数列表
 func Values(args []any) []any {
-	return slices.Map(args, Value)
+	return slicex.Map(args, Value)
 }
 
 // ValueTo 解析参数为指定类型
@@ -30,14 +30,5 @@ func ValueTo[T any](v any) T {
 
 // ValuesTo 解析参数列表为指定类型
 func ValuesTo[T any](args []any) []T {
-	return slices.Map(args, ValueTo[T])
-}
-
-// ToStringMap 转换 map[K]V 到 map[string]V
-func ToStringMap[K ~string, V any](values map[K]V) map[string]V {
-	result := make(map[string]V, len(values))
-	for k, v := range values {
-		result[string(k)] = v
-	}
-	return result
+	return slicex.Map(args, ValueTo[T])
 }
