@@ -1,12 +1,12 @@
 package slicex
 
-func Map[I any, O any](args []I, transform func(I) O) []O {
-	if args == nil {
+func Map[T, R any](collection []T, transform func(item T) R) []R {
+	if collection == nil {
 		return nil
 	}
-	result := make([]O, len(args))
-	for i, a := range args {
-		result[i] = transform(a)
+	result := make([]R, len(collection))
+	for i, item := range collection {
+		result[i] = transform(item)
 	}
 	return result
 }
