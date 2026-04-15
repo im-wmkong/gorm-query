@@ -134,14 +134,14 @@ func NewProfileRepository(dbClient db.Client) *ProfileRepository {
 type UserService struct {
     userRepo    *UserRepository
     profileRepo *ProfileRepository
-    tm          db.TransactionManager
+    transactor  db.Transactor
 }
 
-func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, tm db.TransactionManager) *UserService {
+func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, transactor db.Transactor) *UserService {
     return &UserService{
-        userRepo: userRepo,
+        userRepo:    userRepo,
         profileRepo: profileRepo,
-        tm: tm,
+        transactor:  transactor,
     }
 }
 ```
@@ -154,7 +154,7 @@ import (
 )
 
 // 1. 初始化 DB Client
-// 它同时实现了 repo 需要的 db.Connector 和 service 需要的 db.TransactionManager 接口
+// 它同时实现了 repo 需要的 db.DBProvider 和 service 需要的 db.Transactor 接口
 dbClient := db.NewClient(gormDB)
 // 2. 实例化 UserRepository
 userRepo := NewUserRepository(dbClient)
@@ -169,7 +169,7 @@ userService := NewUserService(userRepo, profileRepo, dbClient)
 // 业务代码完全不需要知道底层 gorm.DB 的存在
 func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User, profile *model.Profile) error {
     // 开启事务
-    return s.tm.Transaction(ctx, func(txCtx context.Context) error {
+    return s.transactor.Transaction(ctx, func(txCtx context.Context) error {
         // 自动使用 txCtx 中的事务连接
         if err := s.userRepo.Create(txCtx, user); err != nil {
             return err 

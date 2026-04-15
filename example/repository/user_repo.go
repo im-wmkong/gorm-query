@@ -18,8 +18,8 @@ type userRepository struct {
 }
 
 // NewUserRepository 创建一个新的 user repository
-func NewUserRepository(connector db.Connector) UserRepository {
+func NewUserRepository(dbProvider db.DBProvider) UserRepository {
 	return &userRepository{
-		BaseRepository: repo.New[model.User](connector),
+		BaseRepository: repo.New[model.User](dbProvider),
 	}
 }

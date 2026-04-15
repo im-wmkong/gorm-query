@@ -1,7 +1,7 @@
 // Package repo 提供了一个基于泛型的企业级 GORM 通用仓储（Repository）实现。
 //
 // BaseRepository[T] 封装了最常用的 CRUD 操作（如 Create, Update, Find, Count 等）。
-// 结合 db 包的 Connector，它能够自动感知上下文中的事务；
+// 结合 db 包的 DBProvider，它能够自动感知上下文中的事务；
 // 结合 query 包的 Builder，它能够接收强类型的查询条件，彻底消除魔法字符串。
 package repo
 
@@ -36,17 +36,17 @@ type Repository[T any] interface {
 var _ Repository[any] = (*BaseRepository[any])(nil)
 
 type BaseRepository[T any] struct {
-	connector db.Connector
+	dbProvider db.DBProvider
 }
 
 // New 创建一个新的 BaseRepository 实例
-func New[T any](connector db.Connector) *BaseRepository[T] {
-	return &BaseRepository[T]{connector: connector}
+func New[T any](dbProvider db.DBProvider) *BaseRepository[T] {
+	return &BaseRepository[T]{dbProvider: dbProvider}
 }
 
 // DB 返回当前上下文的 GORM DB 实例
 func (r *BaseRepository[T]) DB(ctx context.Context) *gorm.DB {
-	return r.connector.DB(ctx)
+	return r.dbProvider.DB(ctx)
 }
 
 func (r *BaseRepository[T]) buildQuery(ctx context.Context, qb *query.Builder) *gorm.DB {

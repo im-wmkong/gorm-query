@@ -20,21 +20,21 @@ type UserService interface {
 
 // userService 实现继承自 BaseService
 type userService struct {
-	repo repository.UserRepository // 如果需要自定义方法，保留特定的 repo 引用
-	tm   db.TransactionManager
+	repo       repository.UserRepository // 如果需要自定义方法，保留特定的 repo 引用
+	transactor db.Transactor
 }
 
 // NewUserService 创建一个新的 user service
-func NewUserService(repo repository.UserRepository, tm db.TransactionManager) UserService {
+func NewUserService(repo repository.UserRepository, tm db.Transactor) UserService {
 	return &userService{
-		repo: repo,
-		tm:   tm,
+		repo:       repo,
+		transactor: tm,
 	}
 }
 
 // CreateUser 创建一个新用户并进行验证
 func (s *userService) CreateUser(ctx context.Context, user *model.User) error {
-	return s.tm.Transaction(ctx, func(ctx context.Context) error {
+	return s.transactor.Transaction(ctx, func(ctx context.Context) error {
 		// 检查用户邮箱是否已存在
 		q := query.New().Where(model.UserProps.Email.Eq(user.Email))
 		count, err := s.repo.Count(ctx, q)

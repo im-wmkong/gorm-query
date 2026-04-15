@@ -1,6 +1,6 @@
 // Package db 提供了基于 context.Context 的 GORM 数据库连接与事务管理能力。
 //
-// 它定义了 Connector 和 TransactionManager 接口，使得业务的 Service 层可以
+// 它定义了 DBProvider 和 Transactor 接口，使得业务的 Service 层可以
 // 在不感知底层 *gorm.DB 实例的情况下开启和传递事务，从而实现 Repo 层与 Service 层的完美解耦。
 package db
 
@@ -14,19 +14,19 @@ type txKeyType struct{}
 
 var txKey = txKeyType{}
 
-// Connector 定义了数据库连接的接口
-type Connector interface {
+// DBProvider 定义了数据库连接的接口
+type DBProvider interface {
 	DB(ctx context.Context) *gorm.DB
 }
 
-// TransactionManager 定义了数据库事务管理的接口
-type TransactionManager interface {
+// Transactor 定义了数据库事务管理的接口
+type Transactor interface {
 	Transaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-var _ Connector = (*Client)(nil)
+var _ DBProvider = (*Client)(nil)
 
-var _ TransactionManager = (*Client)(nil)
+var _ Transactor = (*Client)(nil)
 
 type Client struct {
 	db *gorm.DB

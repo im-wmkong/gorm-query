@@ -136,14 +136,14 @@ func NewProfileRepository(dbClient db.Client) *ProfileRepository {
 type UserService struct {
     userRepo    *UserRepository
     profileRepo *ProfileRepository
-    tm          db.TransactionManager
+    transactor  db.Transactor
 }
 
-func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, tm db.TransactionManager) *UserService {
+func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, transactor db.Transactor) *UserService {
     return &UserService{
         userRepo:    userRepo,
         profileRepo: profileRepo,
-        tm:          tm,
+        transactor:  transactor,
     }
 }
 ```
@@ -169,7 +169,7 @@ userService := NewUserService(userRepo, profileRepo, dbClient)
 // Business logic doesn't need to know about gorm.DB
 func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User, profile *model.Profile) error {
     // Transaction starts here
-    return s.tm.Transaction(ctx, func(txCtx context.Context) error {
+    return s.transactor.Transaction(ctx, func(txCtx context.Context) error {
         // Automatically uses the transaction stored in txCtx
         if err := s.userRepo.Create(txCtx, user); err != nil {
             return err 

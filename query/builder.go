@@ -73,6 +73,13 @@ func (b *Builder) Omit(columns ...any) *Builder {
 	})
 }
 
+// Distinct 去重
+func (b *Builder) Distinct(args ...any) *Builder {
+	return b.bind(func(db *gorm.DB) *gorm.DB {
+		return db.Distinct(column.Values(args)...)
+	})
+}
+
 // Joins 连接查询
 func (b *Builder) Joins(query string, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -134,13 +141,6 @@ func (b *Builder) Limit(limit int) *Builder {
 func (b *Builder) Offset(offset int) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Offset(offset)
-	})
-}
-
-// Distinct 去重
-func (b *Builder) Distinct(args ...any) *Builder {
-	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Distinct(column.Values(args)...)
 	})
 }
 

@@ -23,7 +23,7 @@ func main() {
 	_ = gormDB.AutoMigrate(&model.User{})
 
 	// 2. 初始化核心组件：db.Client
-	// 它同时实现了 repo 需要的 db.Connector 和 service 需要的 db.TransactionManager
+	// 它同时实现了 repo 需要的 db.DBProvider 和 service 需要的 db.Transactor
 	dbClient := db.NewClient(gormDB)
 
 	// 3. 依赖注入 (模拟 Wire 等 DI 工具的过程)

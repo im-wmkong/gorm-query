@@ -84,13 +84,13 @@ func (s *stubUserRepository) Pluck(ctx context.Context, qb *query.Builder, colum
 	return nil
 }
 
-type stubTransactionManager struct {
+type stubTransactor struct {
 	txCtx  context.Context
 	txErr  error
 	called int
 }
 
-func (s *stubTransactionManager) Transaction(ctx context.Context, fn func(context.Context) error) error {
+func (s *stubTransactor) Transaction(ctx context.Context, fn func(context.Context) error) error {
 	s.called++
 	if s.txErr != nil {
 		return s.txErr
@@ -270,7 +270,7 @@ func TestCreateUser(t *testing.T) {
 func TestCreateUser_ErrorPaths(t *testing.T) {
 	t.Run("count error should propagate", func(t *testing.T) {
 		repo := &stubUserRepository{countErr: errors.New("count failed")}
-		tm := &stubTransactionManager{}
+		tm := &stubTransactor{}
 		svc := service.NewUserService(repo, tm)
 
 		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
@@ -283,7 +283,7 @@ func TestCreateUser_ErrorPaths(t *testing.T) {
 
 	t.Run("duplicate user should not create record", func(t *testing.T) {
 		repo := &stubUserRepository{count: 1}
-		tm := &stubTransactionManager{}
+		tm := &stubTransactor{}
 		svc := service.NewUserService(repo, tm)
 
 		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
@@ -296,7 +296,7 @@ func TestCreateUser_ErrorPaths(t *testing.T) {
 	t.Run("create error should rollback through transaction context", func(t *testing.T) {
 		txCtx := context.WithValue(context.Background(), struct{}{}, "tx")
 		repo := &stubUserRepository{createErr: errors.New("create failed")}
-		tm := &stubTransactionManager{txCtx: txCtx}
+		tm := &stubTransactor{txCtx: txCtx}
 		svc := service.NewUserService(repo, tm)
 
 		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
@@ -310,7 +310,7 @@ func TestCreateUser_ErrorPaths(t *testing.T) {
 
 	t.Run("transaction manager error should short circuit", func(t *testing.T) {
 		repo := &stubUserRepository{}
-		tm := &stubTransactionManager{txErr: errors.New("transaction failed")}
+		tm := &stubTransactor{txErr: errors.New("transaction failed")}
 		svc := service.NewUserService(repo, tm)
 
 		err := svc.CreateUser(context.Background(), &model.User{Email: "eve@example.com"})
