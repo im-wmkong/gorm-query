@@ -22,10 +22,7 @@ func Values(args []any) []any {
 
 // ValueTo 解析参数为指定类型
 func ValueTo[T cast.Basic](v any) T {
-	if val, ok := Value(v).(T); ok {
-		return val
-	}
-	return cast.To[T](v)
+	return cast.To[T](Value(v))
 }
 
 // ValuesTo 解析参数列表为指定类型
