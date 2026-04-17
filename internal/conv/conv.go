@@ -1,4 +1,4 @@
-package cast
+package conv
 
 import "github.com/im-wmkong/gorm-query/internal/mapx"
 

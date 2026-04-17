@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/im-wmkong/gorm-query/internal/slicex"
+	"github.com/spf13/cast"
 )
 
 // Value 解析参数
@@ -20,15 +21,14 @@ func Values(args []any) []any {
 }
 
 // ValueTo 解析参数为指定类型
-func ValueTo[T any](v any) T {
+func ValueTo[T cast.Basic](v any) T {
 	if val, ok := Value(v).(T); ok {
 		return val
 	}
-	var zero T
-	return zero
+	return cast.To[T](v)
 }
 
 // ValuesTo 解析参数列表为指定类型
-func ValuesTo[T any](args []any) []T {
+func ValuesTo[T cast.Basic](args []any) []T {
 	return slicex.Map(args, ValueTo[T])
 }

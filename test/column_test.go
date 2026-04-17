@@ -28,8 +28,8 @@ func TestInternalColumn(t *testing.T) {
 	t.Run("ValueTo and ValuesTo keep zero values on mismatch", func(t *testing.T) {
 		assert.Equal(t, "age", column.ValueTo[string](query.Column("age")))
 		assert.Equal(t, "name", column.ValueTo[string](stringerValue("name")))
-		assert.Empty(t, column.ValueTo[string](123))
-		assert.Equal(t, []string{"id", "status", ""}, column.ValuesTo[string]([]any{query.Column("id"), stringerValue("status"), 10}))
+		assert.Equal(t, "123", column.ValueTo[string](123))
+		assert.Equal(t, []string{"id", "status", "10"}, column.ValuesTo[string]([]any{query.Column("id"), stringerValue("status"), 10}))
 		assert.Nil(t, column.ValuesTo[string](nil))
 	})
 }

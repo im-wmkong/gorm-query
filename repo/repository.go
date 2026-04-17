@@ -9,7 +9,7 @@ import (
 	"context"
 
 	"github.com/im-wmkong/gorm-query/db"
-	"github.com/im-wmkong/gorm-query/internal/cast"
+	"github.com/im-wmkong/gorm-query/internal/conv"
 	"github.com/im-wmkong/gorm-query/query"
 
 	"gorm.io/gorm"
@@ -83,7 +83,7 @@ func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, colum
 // Updates 更新记录的多个字段
 func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values any) (int64, error) {
 	if mapVals, ok := values.(map[query.Column]any); ok {
-		values = cast.ToStringMap(mapVals)
+		values = conv.ToStringMap(mapVals)
 	}
 	result := r.buildQuery(ctx, qb).Updates(values)
 	return result.RowsAffected, result.Error
