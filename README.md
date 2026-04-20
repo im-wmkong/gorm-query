@@ -12,7 +12,7 @@ It eliminates fragile "magic strings" in GORM queries through **code generation*
 
 ## ✨ Core Features
 
-- 🛡️ **Strongly-typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `UserProps.Age.Gte(18)`. Catch field name typos at compile time.
+- 🛡️ **Strongly-typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `UserProps.Age.Gt(18)`. Catch field name typos at compile time.
 - 📦 **Out-of-the-box Generic Repository**: Use `repo.BaseRepository[T]` to gain full CRUD capabilities with a single line of code.
 - 🎯 **Stop Bloating Repositories**: Combine the universal query builder to compose dynamic queries on the fly—no more writing dozens of `FindByXxx` methods.
 - 🔄 **Implicit Context Transactions**: Pass transactions via `context.Context`. Decouple your Service layer from the Repo layer without passing `*gorm.DB` everywhere.
