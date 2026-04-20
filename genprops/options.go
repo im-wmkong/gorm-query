@@ -10,7 +10,7 @@ type config struct {
 	packageName    string
 	namingStrategy schema.NamingStrategy
 	dryRun         bool
-	logger         func(string, ...interface{})
+	logger         func(format string, a ...any)
 }
 
 func defaultConfig() config {
@@ -59,7 +59,7 @@ func WithDryRun(d bool) Option {
 }
 
 // WithLogger 设置日志记录器
-func WithLogger(fn func(string, ...interface{})) Option {
+func WithLogger(fn func(format string, a ...any)) Option {
 	return func(c *config) {
 		c.logger = fn
 	}
