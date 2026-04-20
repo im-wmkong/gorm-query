@@ -103,25 +103,34 @@ func (r *BaseRepository[T]) Find(ctx context.Context, qb *query.Builder) ([]*T, 
 	return entities, err
 }
 
-// First 获取第一条记录（主键升序）
+// First 获取第一条记录（主键升序）。未找到时返回 (nil, error)。
 func (r *BaseRepository[T]) First(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
 	err := r.buildQuery(ctx, qb).First(&entity).Error
-	return &entity, err
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
 }
 
-// Take 获取一条记录，没有指定排序字段
+// Take 获取一条记录，没有指定排序字段。未找到时返回 (nil, error)。
 func (r *BaseRepository[T]) Take(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
 	err := r.buildQuery(ctx, qb).Take(&entity).Error
-	return &entity, err
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
 }
 
-// Last 获取最后一条记录（主键降序）
+// Last 获取最后一条记录（主键降序）。未找到时返回 (nil, error)。
 func (r *BaseRepository[T]) Last(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
 	err := r.buildQuery(ctx, qb).Last(&entity).Error
-	return &entity, err
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
 }
 
 // Count 查询记录数

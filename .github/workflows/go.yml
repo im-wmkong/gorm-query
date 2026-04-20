@@ -15,7 +15,8 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.21' # 建议与你 go.mod 中的版本保持一致
+        go-version-file: 'go.mod'
+        cache: true
 
     - name: Install dependencies
       run: go mod download
@@ -25,5 +26,18 @@ jobs:
       run: |
         go generate ./example/...
 
-    - name: Test
-      run: go test -v -race ./...
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.62.2
+        args: --timeout=5m
+
+    - name: Test (with coverage)
+      run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: coverage.out
+        if-no-files-found: error

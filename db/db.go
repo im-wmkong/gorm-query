@@ -32,8 +32,11 @@ type Client struct {
 	db *gorm.DB
 }
 
-// NewClient 创建一个新的 Client 实例
+// NewClient 创建一个新的 Client 实例。db 不能为 nil，否则 panic。
 func NewClient(db *gorm.DB) *Client {
+	if db == nil {
+		panic("db: NewClient called with nil *gorm.DB")
+	}
 	return &Client{db: db}
 }
 

@@ -1,4 +1,4 @@
-package test
+package column_test
 
 import (
 	"testing"
@@ -14,7 +14,7 @@ func (s stringerValue) String() string {
 	return string(s)
 }
 
-func TestInternalColumn(t *testing.T) {
+func TestColumn(t *testing.T) {
 	t.Run("Value and Values unwrap stringer", func(t *testing.T) {
 		args := []any{query.Column("user_name"), stringerValue("status"), 42}
 

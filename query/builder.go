@@ -15,7 +15,9 @@ import (
 // 这是核心抽象，所有的 WHERE 条件最终都转换为此函数
 type Condition func(db *gorm.DB) *gorm.DB
 
-// Builder 查询构建器
+// Builder 查询构建器。
+// Builder 不是并发安全的，不要在多个 goroutine 中同时使用同一个 Builder 实例。
+// 如需在多个 goroutine 中复用查询条件，请使用 Clone 方法创建独立副本。
 type Builder struct {
 	conditions []Condition
 }

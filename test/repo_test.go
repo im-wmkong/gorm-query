@@ -193,9 +193,8 @@ func TestGetByID(t *testing.T) {
 	user999, err := repo.First(ctx, qID999)
 
 	require.Error(t, err)
-	require.NotNil(t, user999)
+	require.Nil(t, user999) // error 时返回 nil
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	assert.Zero(t, user999.ID)
 }
 
 // TestDelete 测试删除
@@ -424,10 +423,8 @@ func TestTakeAndLast(t *testing.T) {
 	assert.Equal(t, "admin", last.UserName)
 
 	notFound, err := repo.Take(ctx, query.New().Where(model.UserProps.UserName.Eq("Nobody")))
-	require.Error(t, err)
-	require.NotNil(t, notFound)
-	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	assert.Zero(t, notFound.ID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	require.Nil(t, notFound)
 }
 
 func TestPluck(t *testing.T) {

@@ -1,4 +1,4 @@
-package test
+package gormx_test
 
 import (
 	"path/filepath"
@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestInternalGormxBuildNested(t *testing.T) {
+func TestGormxBuildNested(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "gormx.db")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	require.NoError(t, err)
