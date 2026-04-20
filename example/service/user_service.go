@@ -12,13 +12,13 @@ import (
 
 var ErrUserAlreadyExists = errors.New("user already exists")
 
-// UserService 定义了继承自通用 Service 接口的服务接口
+// UserService 定义 UserService 接口
 type UserService interface {
 	CreateUser(ctx context.Context, user *model.User) error
 	GetActiveUsers(ctx context.Context, minAge int, keyword string) ([]*model.User, error)
 }
 
-// userService 实现继承自 BaseService
+// userService 实现 UserService
 type userService struct {
 	repo       repository.UserRepository // 如果需要自定义方法，保留特定的 repo 引用
 	transactor db.Transactor
