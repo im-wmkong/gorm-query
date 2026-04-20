@@ -9,7 +9,7 @@ import (
 	"context"
 
 	"github.com/im-wmkong/gorm-query/db"
-	"github.com/im-wmkong/gorm-query/internal/conv"
+	"github.com/im-wmkong/gorm-query/internal/column"
 	"github.com/im-wmkong/gorm-query/query"
 
 	"gorm.io/gorm"
@@ -51,11 +51,11 @@ func (r *BaseRepository[T]) DB(ctx context.Context) *gorm.DB {
 
 func (r *BaseRepository[T]) buildQuery(ctx context.Context, qb *query.Builder) *gorm.DB {
 	var entity T
-	db := r.DB(ctx).Model(&entity)
+	session := r.DB(ctx).Model(&entity)
 	if qb != nil {
-		db = qb.Apply(db)
+		session = qb.Apply(session)
 	}
-	return db
+	return session
 }
 
 // Save 保存记录
@@ -83,7 +83,7 @@ func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, colum
 // Updates 更新记录的多个字段
 func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values any) (int64, error) {
 	if mapVals, ok := values.(map[query.Column]any); ok {
-		values = conv.ToStringMap(mapVals)
+		values = column.ToStringMap(mapVals)
 	}
 	result := r.buildQuery(ctx, qb).Updates(values)
 	return result.RowsAffected, result.Error

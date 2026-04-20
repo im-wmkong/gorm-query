@@ -32,4 +32,14 @@ func TestInternalColumn(t *testing.T) {
 		assert.Equal(t, []string{"id", "status", "10"}, column.ValuesTo[string]([]any{query.Column("id"), stringerValue("status"), 10}))
 		assert.Nil(t, column.ValuesTo[string](nil))
 	})
+
+	t.Run("ToStringMap converts map to string values", func(t *testing.T) {
+		values := map[query.Column]int{
+			query.Column("age"):    18,
+			query.Column("status"): 1,
+		}
+
+		assert.Equal(t, map[string]int{"age": 18, "status": 1}, column.ToStringMap(values))
+		assert.Empty(t, column.ToStringMap(map[query.Column]int(nil)))
+	})
 }

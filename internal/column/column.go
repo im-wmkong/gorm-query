@@ -3,6 +3,7 @@ package column
 import (
 	"fmt"
 
+	"github.com/im-wmkong/gorm-query/internal/mapx"
 	"github.com/im-wmkong/gorm-query/internal/slicex"
 	"github.com/spf13/cast"
 )
@@ -28,4 +29,11 @@ func ValueTo[T cast.Basic](v any) T {
 // ValuesTo 解析参数列表为指定类型
 func ValuesTo[T cast.Basic](args []any) []T {
 	return slicex.Map(args, ValueTo[T])
+}
+
+// ToStringMap 转换 map[K]V 到 map[string]V
+func ToStringMap[K ~string, V any](values map[K]V) map[string]V {
+	return mapx.MapKeys(values, func(k K) string {
+		return string(k)
+	})
 }
