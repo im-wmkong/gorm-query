@@ -26,7 +26,7 @@ type partiallyIgnoredGenPropsModel struct {
 	Ignored string `gorm:"-"`
 }
 
-func TestGenPropsGenerateAll_SuccessAndIdempotent(t *testing.T) {
+func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	outDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outDir, "ignored_test.go"), []byte("package ignored\n"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(outDir, "notes.txt"), []byte("plain text"), 0644))
@@ -45,7 +45,7 @@ func TestGenPropsGenerateAll_SuccessAndIdempotent(t *testing.T) {
 		}),
 	)
 
-	err := g.GenerateAll([]any{&model.User{}, &model.User{}})
+	err := g.Generate(&model.User{}, &model.User{})
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(outDir, "custom_props.go"))
@@ -62,19 +62,19 @@ func TestGenPropsGenerateAll_SuccessAndIdempotent(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(generated, "var UserProps = struct"))
 	assert.Equal(t, 1, logCalls)
 
-	err = g.GenerateAll([]any{&model.User{}})
+	err = g.Generate(&model.User{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, logCalls)
 }
 
-func TestGenPropsGenerateAll_WithExplicitPackageNameForMixedModels(t *testing.T) {
+func TestGenPropsGenerate_WithExplicitPackageNameForMixedModels(t *testing.T) {
 	outDir := t.TempDir()
 
 	err := genprops.New(
 		genprops.WithOutputDir(outDir),
 		genprops.WithOutputFile("mixed_props.go"),
 		genprops.WithPackageName("model"),
-	).GenerateAll([]any{&model.User{}, &localGenPropsModel{}})
+	).Generate(&model.User{}, &localGenPropsModel{})
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(outDir, "mixed_props.go"))
@@ -87,14 +87,14 @@ func TestGenPropsGenerateAll_WithExplicitPackageNameForMixedModels(t *testing.T)
 	assert.Contains(t, generated, `ID: "id"`)
 }
 
-func TestGenPropsGenerateAll_SkipsModelsWithoutSchemaFields(t *testing.T) {
+func TestGenPropsGenerate_SkipsModelsWithoutSchemaFields(t *testing.T) {
 	outDir := t.TempDir()
 
 	err := genprops.New(
 		genprops.WithOutputDir(outDir),
 		genprops.WithOutputFile("empty_props.go"),
 		genprops.WithPackageName("test"),
-	).GenerateAll([]any{&emptyGenPropsModel{}})
+	).Generate(&emptyGenPropsModel{})
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(outDir, "empty_props.go"))
@@ -105,14 +105,14 @@ func TestGenPropsGenerateAll_SkipsModelsWithoutSchemaFields(t *testing.T) {
 	assert.NotContains(t, generated, "Props defines the fields")
 }
 
-func TestGenPropsGenerateAll_SkipsIgnoredFields(t *testing.T) {
+func TestGenPropsGenerate_SkipsIgnoredFields(t *testing.T) {
 	outDir := t.TempDir()
 
 	err := genprops.New(
 		genprops.WithOutputDir(outDir),
 		genprops.WithOutputFile("ignored_props.go"),
 		genprops.WithPackageName("test"),
-	).GenerateAll([]any{&partiallyIgnoredGenPropsModel{}})
+	).Generate(&partiallyIgnoredGenPropsModel{})
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(outDir, "ignored_props.go"))
@@ -147,15 +147,15 @@ func TestGenPropsGenerate_DryRun(t *testing.T) {
 	assert.Contains(t, err.Error(), propsFile)
 }
 
-func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
+func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 	t.Run("no models", func(t *testing.T) {
-		err := genprops.New().GenerateAll(nil)
+		err := genprops.New().Generate(nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no models provided")
 	})
 
 	t.Run("mixed packages without explicit package name", func(t *testing.T) {
-		err := genprops.New(genprops.WithOutputDir(t.TempDir())).GenerateAll([]any{&model.User{}, &localGenPropsModel{}})
+		err := genprops.New(genprops.WithOutputDir(t.TempDir())).Generate(&model.User{}, &localGenPropsModel{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "all models must be in the same package")
 	})
@@ -167,7 +167,7 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		err := genprops.New(
 			genprops.WithOutputDir(outDir),
 			genprops.WithPackageName("model"),
-		).GenerateAll([]any{&model.User{}})
+		).Generate(&model.User{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "package mismatch")
 	})
@@ -177,7 +177,7 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		blockedPath := filepath.Join(baseDir, "blocked")
 		require.NoError(t, os.WriteFile(blockedPath, []byte("not a directory"), 0644))
 
-		err := genprops.New(genprops.WithOutputDir(blockedPath)).GenerateAll([]any{&model.User{}})
+		err := genprops.New(genprops.WithOutputDir(blockedPath)).Generate(&model.User{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "create output dir failed")
 	})
@@ -188,7 +188,7 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		err := genprops.New(
 			genprops.WithOutputDir(outDir),
 			genprops.WithOutputFile(filepath.Join("nested", "props_gen.go")),
-		).GenerateAll([]any{&model.User{}})
+		).Generate(&model.User{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "write file failed")
 	})
@@ -201,7 +201,7 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		err := genprops.New(
 			genprops.WithOutputDir(outDir),
 			genprops.WithPackageName("model"),
-		).GenerateAll([]any{&model.User{}})
+		).Generate(&model.User{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "detect package failed")
 	})
@@ -210,7 +210,7 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		err := genprops.New(
 			genprops.WithOutputDir(t.TempDir()),
 			genprops.WithPackageName("broken"),
-		).GenerateAll([]any{123})
+		).Generate(123)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "gorm schema parse failed")
 	})
@@ -219,7 +219,7 @@ func TestGenPropsGenerateAll_ErrorScenarios(t *testing.T) {
 		err := genprops.New(
 			genprops.WithOutputDir(t.TempDir()),
 			genprops.WithPackageName("invalid-package"),
-		).GenerateAll([]any{&model.User{}})
+		).Generate(&model.User{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "render failed")
 	})

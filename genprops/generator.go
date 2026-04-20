@@ -34,7 +34,7 @@ func New(opts ...Option) *Generator {
 	return &Generator{cfg: cfg}
 }
 
-func (g *Generator) GenerateAll(models []any) error {
+func (g *Generator) Generate(models ...any) error {
 	if len(models) == 0 {
 		return fmt.Errorf("no models provided")
 	}
@@ -153,8 +153,4 @@ func (g *Generator) GenerateAll(models []any) error {
 	}
 
 	return nil
-}
-
-func (g *Generator) Generate(model any) error {
-	return g.GenerateAll([]any{model})
 }

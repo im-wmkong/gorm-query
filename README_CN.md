@@ -10,7 +10,7 @@
 
 ## ✨ 核心特性
 
-- 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `UserProps.Age.Gt(18)`，在编译期拦截字段名拼写错误。
+- 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `UserProps.Age.Gte(18)`，在编译期拦截字段名拼写错误。
 - 📦 **开箱即用的泛型仓储**：提供 `repo.BaseRepository[T]`，一行代码拥有完整的 CRUD 能力。
 - 🎯 **告别臃肿的 Repository**：结合通用 builder 查询构建器，按需动态组合查询条件，无需再为不同业务编写数十个 `FindByXxx` 方法。
 - 🔄 **隐式上下文事务**：基于 `context.Context` 传递事务，Service 层与 Repo 层彻底解耦，再也不用把 `*gorm.DB` 传来传去。
@@ -57,9 +57,7 @@ import (
 
 func main() {
     // 实例化生成器并传入模型
-    err := genprops.New().GenerateAll([]any{
-        model.User{},
-    })
+   err := genprops.New().Generate(&model.User{})
     
     if err != nil {
         log.Fatalf("generate failed: %v", err)

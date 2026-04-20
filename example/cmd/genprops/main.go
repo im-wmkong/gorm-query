@@ -10,7 +10,7 @@ import (
 func main() {
 	g := genprops.New()
 
-	if err := g.GenerateAll([]any{model.User{}}); err != nil {
+	if err := g.Generate(&model.User{}); err != nil {
 		log.Fatal(err)
 	}
 }
