@@ -26,6 +26,16 @@ type partiallyIgnoredGenPropsModel struct {
 	Ignored string `gorm:"-"`
 }
 
+type testLogger struct {
+	infoCalls  int
+	debugCalls int
+	warnCalls  int
+}
+
+func (l *testLogger) Debug(string, ...any) { l.debugCalls++ }
+func (l *testLogger) Info(string, ...any)  { l.infoCalls++ }
+func (l *testLogger) Warn(string, ...any)  { l.warnCalls++ }
+
 func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	outDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outDir, "ignored_test.go"), []byte("package ignored\n"), 0644))
@@ -34,15 +44,13 @@ func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(outDir, "nested"), 0755))
 	require.NoError(t, os.Symlink(filepath.Join(outDir, "missing.go"), filepath.Join(outDir, "broken_link.go")))
 
-	logCalls := 0
+	tl := &testLogger{}
 	g := genprops.New(
 		genprops.WithOutputDir(outDir),
 		genprops.WithOutputFile("custom_props.go"),
 		genprops.WithPackageName("model"),
 		genprops.WithNamingStrategy(schema.NamingStrategy{SingularTable: true}),
-		genprops.WithLogger(func(format string, args ...interface{}) {
-			logCalls++
-		}),
+		genprops.WithLogger(tl),
 	)
 
 	err := g.Generate(&model.User{}, &model.User{})
@@ -60,11 +68,18 @@ func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	assert.Contains(t, generated, `UserName:  "user_name"`)
 	assert.Contains(t, generated, `import query "github.com/im-wmkong/gorm-query/query"`)
 	assert.Equal(t, 1, strings.Count(generated, "var UserProps = struct"))
-	assert.Equal(t, 1, logCalls)
 
+	// 首次生成：Info 包含 "generating props..." 和 "generated ..."
+	assert.Equal(t, 2, tl.infoCalls)
+	// 重复 User 触发一次 Warn
+	assert.Equal(t, 1, tl.warnCalls)
+	assert.Greater(t, tl.debugCalls, 0)
+
+	prevInfo := tl.infoCalls
 	err = g.Generate(&model.User{})
 	require.NoError(t, err)
-	assert.Equal(t, 1, logCalls)
+	// 幂等：内容未变，跳过写入只产生 Debug，Info 不再增加（除了 "generating props..."）
+	assert.Equal(t, prevInfo+1, tl.infoCalls)
 }
 
 func TestGenPropsGenerate_WithExplicitPackageNameForMixedModels(t *testing.T) {

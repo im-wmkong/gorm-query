@@ -10,7 +10,7 @@ type config struct {
 	packageName    string
 	namingStrategy schema.NamingStrategy
 	dryRun         bool
-	logger         func(format string, a ...any)
+	logger         Logger
 }
 
 func defaultConfig() config {
@@ -20,6 +20,7 @@ func defaultConfig() config {
 		namingStrategy: schema.NamingStrategy{
 			SingularTable: true,
 		},
+		logger: NewDefaultLogger(),
 	}
 }
 
@@ -58,9 +59,13 @@ func WithDryRun(d bool) Option {
 	}
 }
 
-// WithLogger 设置日志记录器
-func WithLogger(fn func(format string, a ...any)) Option {
+// WithLogger 设置日志记录器。传入 nil 时使用静默 Logger。
+func WithLogger(l Logger) Option {
 	return func(c *config) {
-		c.logger = fn
+		if l == nil {
+			c.logger = NopLogger()
+		} else {
+			c.logger = l
+		}
 	}
 }
