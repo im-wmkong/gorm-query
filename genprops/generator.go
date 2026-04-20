@@ -35,6 +35,15 @@ func New(opts ...Option) *Generator {
 }
 
 func (g *Generator) Generate(models ...any) error {
+	// 过滤 nil 元素
+	filtered := models[:0]
+	for _, model := range models {
+		if model != nil {
+			filtered = append(filtered, model)
+		}
+	}
+	models = filtered
+
 	if len(models) == 0 {
 		return fmt.Errorf("no models provided")
 	}
@@ -45,8 +54,8 @@ func (g *Generator) Generate(models ...any) error {
 		pkgName = reflectx.PackageName(models[0])
 
 		// 自动推导时校验同包
-		for _, m := range models {
-			if reflectx.PackageName(m) != pkgName {
+		for _, model := range models {
+			if reflectx.PackageName(model) != pkgName {
 				return fmt.Errorf("all models must be in the same package or explicitly set WithPackageName")
 			}
 		}
@@ -77,26 +86,26 @@ func (g *Generator) Generate(models ...any) error {
 
 	seen := make(map[string]struct{})
 
-	for _, m := range models {
-		s, err := schema.Parse(m, &sync.Map{}, g.cfg.namingStrategy)
+	for _, model := range models {
+		sch, err := schema.Parse(model, &sync.Map{}, g.cfg.namingStrategy)
 		if err != nil {
 			return fmt.Errorf("gorm schema parse failed: %w", err)
 		}
 
-		if len(s.Fields) == 0 {
+		if len(sch.Fields) == 0 {
 			continue
 		}
 
 		// 去重
-		if _, ok := seen[s.Name]; ok {
+		if _, ok := seen[sch.Name]; ok {
 			continue
 		}
-		seen[s.Name] = struct{}{}
+		seen[sch.Name] = struct{}{}
 
-		f.Comment(fmt.Sprintf("%sProps defines the fields for %s", s.Name, s.Name))
+		f.Comment(fmt.Sprintf("%sProps defines the fields for %s", sch.Name, sch.Name))
 
-		f.Var().Id(s.Name+"Props").Op("=").StructFunc(func(grp *jen.Group) {
-			for _, field := range s.Fields {
+		f.Var().Id(sch.Name+"Props").Op("=").StructFunc(func(grp *jen.Group) {
+			for _, field := range sch.Fields {
 				if field.DBName == "" {
 					continue
 				}
@@ -108,7 +117,7 @@ func (g *Generator) Generate(models ...any) error {
 			Separator: ",",
 			Multi:     true,
 		}, func(grp *jen.Group) {
-			for _, field := range s.Fields {
+			for _, field := range sch.Fields {
 				if field.DBName == "" {
 					continue
 				}
