@@ -169,6 +169,16 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 		assert.Contains(t, err.Error(), "no models provided")
 	})
 
+	t.Run("WithLogger nil does not panic", func(t *testing.T) {
+		g := genprops.New(
+			genprops.WithOutputDir(t.TempDir()),
+			genprops.WithPackageName("model"),
+			genprops.WithLogger(nil),
+		)
+		err := g.Generate(&model.User{})
+		require.NoError(t, err)
+	})
+
 	t.Run("mixed packages without explicit package name", func(t *testing.T) {
 		err := genprops.New(genprops.WithOutputDir(t.TempDir())).Generate(&model.User{}, &localGenPropsModel{})
 		require.Error(t, err)

@@ -439,3 +439,49 @@ func TestPluck(t *testing.T) {
 	require.Len(t, names, 5)
 	assert.Equal(t, []string{"Alice", "Bob", "Charlie", "David", "admin"}, names)
 }
+
+// TestUpdates_WithStruct 测试 Updates 传入 struct（非 map）时走 else 分支
+func TestUpdates_WithStruct(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	q := query.New().Where(model.UserProps.UserName.Eq("Alice"))
+
+	// 用 struct 更新（GORM 只更新非零值字段）
+	rowsAffected, err := repo.Updates(ctx, q, model.User{Age: 99, Status: 2})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rowsAffected)
+
+	alice, err := repo.First(ctx, q)
+	require.NoError(t, err)
+	assert.Equal(t, 99, alice.Age)
+	assert.Equal(t, 2, alice.Status)
+}
+
+// TestDelete_WithoutCondition 测试无条件 Delete 是否被 GORM 安全机制拦截
+func TestDelete_WithoutCondition(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	// 不带任何 Where 条件的 Delete — GORM 应返回 ErrMissingWhereClause
+	_, err := repo.Delete(ctx, query.New())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, gorm.ErrMissingWhereClause)
+
+	// 数据应仍然完好
+	count, err := repo.Count(ctx, query.New())
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), count)
+}
+
+// TestCreateInBatches_EmptySlice 测试空切片的行为
+func TestCreateInBatches_EmptySlice(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	rowsAffected, err := repo.CreateInBatches(ctx, []*model.User{}, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rowsAffected)
+
+	// 原始数据不受影响
+	count, err := repo.Count(ctx, query.New())
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), count)
+}

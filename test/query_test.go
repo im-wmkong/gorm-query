@@ -705,3 +705,94 @@ func TestQuery_Select_Helpers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", userTable.UserName)
 }
+
+// TestCondition_Idempotent 验证同一 Condition 多次 Apply 不会因闭包 args 被 mutate 而出错
+func TestCondition_Idempotent(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	// 用 Column 作为参数触发 gorm.Expr 转换路径
+	cond := model.UserProps.Age.Gte(model.UserProps.Age)
+	q1 := query.New().Where(cond)
+
+	// 第一次 Apply
+	users1, err := repo.Find(ctx, q1)
+	require.NoError(t, err)
+	assert.Len(t, users1, 5)
+
+	// 第二次用同一个 Condition 再次查询，确保 args 未被污染
+	q2 := query.New().Where(cond)
+	users2, err := repo.Find(ctx, q2)
+	require.NoError(t, err)
+	assert.Len(t, users2, 5)
+}
+
+// TestQuery_InEmpty 验证 In/NotIn 传入空切片时的行为
+func TestQuery_InEmpty(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	// In 空切片 — GORM 生成 WHERE 1=0，应返回空结果
+	qInEmpty := query.New().Where(model.UserProps.UserName.In([]string{}))
+	users, err := repo.Find(ctx, qInEmpty)
+	require.NoError(t, err)
+	assert.Empty(t, users)
+
+	// NotIn 空切片 — GORM 同样生成空条件，返回空结果
+	qNotInEmpty := query.New().Where(model.UserProps.UserName.NotIn([]string{}))
+	users, err = repo.Find(ctx, qNotInEmpty)
+	require.NoError(t, err)
+	assert.Empty(t, users)
+}
+
+// TestQuery_PageNegativeParams 验证 Page 和 Limit/Offset 的极端参数
+func TestQuery_PageNegativeParams(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	// Page(-1, -5) 应归一化为 Page(1, 10)
+	qNeg := query.New().Page(-1, -5).Order(model.UserProps.ID)
+	users, err := repo.Find(ctx, qNeg)
+	require.NoError(t, err)
+	assert.Len(t, users, 5) // 只有 5 条数据，默认 pageSize=10 足够
+
+	// Page(0, 0) 也应归一化
+	qZero := query.New().Page(0, 0).Order(model.UserProps.ID)
+	users, err = repo.Find(ctx, qZero)
+	require.NoError(t, err)
+	assert.Len(t, users, 5)
+
+	// Limit(-1) — GORM 中 -1 表示取消 limit 限制
+	qLimitNeg := query.New().Limit(-1).Order(model.UserProps.ID)
+	users, err = repo.Find(ctx, qLimitNeg)
+	require.NoError(t, err)
+	assert.Len(t, users, 5)
+
+	// Offset(-1) — GORM 中 -1 表示取消 offset
+	qOffsetNeg := query.New().Offset(-1).Order(model.UserProps.ID)
+	users, err = repo.Find(ctx, qOffsetNeg)
+	require.NoError(t, err)
+	assert.Len(t, users, 5)
+}
+
+// TestQuery_Distinct_WithDuplicates 使用重复数据验证 DISTINCT 真正去重
+func TestQuery_Distinct_WithDuplicates(t *testing.T) {
+	ctx, _, repo := setupTest(t)
+
+	// 插入同名用户
+	require.NoError(t, repo.Create(ctx, &model.User{UserName: "Alice", Email: "alice2@example.com", Age: 26, Status: 1}))
+	require.NoError(t, repo.Create(ctx, &model.User{UserName: "Bob", Email: "bob2@example.com", Age: 31, Status: 1}))
+
+	// 不加 Distinct，应返回 7 条（5 原始 + 2 新增）
+	qAll := query.New()
+	all, err := repo.Find(ctx, qAll)
+	require.NoError(t, err)
+	assert.Len(t, all, 7)
+
+	// 加 Distinct user_name，应返回 5 条（5 个不同名字）
+	qDistinct := query.New().
+		Distinct(model.UserProps.UserName).
+		Select(model.UserProps.UserName).
+		Order(model.UserProps.UserName)
+
+	distinct, err := repo.Find(ctx, qDistinct)
+	require.NoError(t, err)
+	assert.Len(t, distinct, 5)
+}

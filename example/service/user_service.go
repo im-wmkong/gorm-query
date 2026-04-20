@@ -68,10 +68,10 @@ func (s *userService) GetActiveUsers(ctx context.Context, minAge int, keyword st
 	)
 
 	if keyword != "" {
-		q.Where(model.UserProps.Email.Like("%" + keyword + "%")) // 演示 Like
+		q = q.Where(model.UserProps.Email.Like("%" + keyword + "%")) // 演示 Like
 	}
 
-	q.Order(model.UserProps.CreatedAt.Desc())
+	q = q.Order(model.UserProps.CreatedAt.Desc())
 
 	return s.repo.Find(ctx, q)
 }
