@@ -293,7 +293,8 @@ func TestCreateUser_ErrorPaths(t *testing.T) {
 	})
 
 	t.Run("create error should rollback through transaction context", func(t *testing.T) {
-		txCtx := context.WithValue(context.Background(), struct{}{}, "tx")
+		type txCtxKey struct{}
+		txCtx := context.WithValue(context.Background(), txCtxKey{}, "tx")
 		repo := &stubUserRepository{createErr: errors.New("create failed")}
 		tm := &stubTransactor{txCtx: txCtx}
 		svc := service.NewUserService(repo, tm)

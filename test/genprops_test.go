@@ -221,7 +221,9 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 	t.Run("detect package failed", func(t *testing.T) {
 		outDir := filepath.Join(t.TempDir(), "locked")
 		require.NoError(t, os.Mkdir(outDir, 0000))
-		defer os.Chmod(outDir, 0755)
+		t.Cleanup(func() {
+			require.NoError(t, os.Chmod(outDir, 0755))
+		})
 
 		err := genprops.New(
 			genprops.WithOutputDir(outDir),

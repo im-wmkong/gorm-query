@@ -285,8 +285,10 @@ func TestQuery_Null_NotNull(t *testing.T) {
 	require.Len(t, usersIsNull, 5)
 
 	// Soft delete Alice
-	alice, _ := repo.First(ctx, query.New().Where(model.UserProps.UserName.Eq("Alice")))
-	repo.Delete(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
+	alice, err := repo.First(ctx, query.New().Where(model.UserProps.UserName.Eq("Alice")))
+	require.NoError(t, err)
+	_, err = repo.Delete(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
+	require.NoError(t, err)
 
 	// Now query Unscoped to find deleted user
 	qIsNotNull := query.New().
@@ -367,12 +369,13 @@ func TestQuery_Not(t *testing.T) {
 func TestQuery_Group_Having(t *testing.T) {
 	// 准备数据: 添加另一个 Age=25 的用户，以便分组测试
 	ctx, _, repo := setupTest(t)
-	repo.Create(ctx, &model.User{
+	err := repo.Create(ctx, &model.User{
 		UserName: "Frank",
 		Email:    "frank@example.com",
 		Age:      25,
 		Status:   1,
 	})
+	require.NoError(t, err)
 
 	// Group by Age, Having Count(*) > 1
 	// 应该找到 Age=25 (Alice, Frank)
@@ -457,8 +460,10 @@ func TestQuery_Unscoped(t *testing.T) {
 	ctx, _, repo := setupTest(t)
 
 	// 删除 Alice
-	alice, _ := repo.First(ctx, query.New().Where(model.UserProps.UserName.Eq("Alice")))
-	repo.Delete(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
+	alice, err := repo.First(ctx, query.New().Where(model.UserProps.UserName.Eq("Alice")))
+	require.NoError(t, err)
+	_, err = repo.Delete(ctx, query.New().Where(model.UserProps.ID.Eq(alice.ID)))
+	require.NoError(t, err)
 
 	// Normal find - Alice missing
 	users, _ := repo.Find(ctx, query.New())
