@@ -33,7 +33,7 @@ func (d *defaultLogger) Warn(format string, a ...any)  { d.l.Printf("[WARN]  "+f
 type nopLogger struct{}
 
 // NopLogger 返回一个静默的 Logger，不输出任何日志。
-func NopLogger() Logger                { return nopLogger{} }
-func (nopLogger) Debug(string, ...any) {}
-func (nopLogger) Info(string, ...any)  {}
-func (nopLogger) Warn(string, ...any)  {}
+func NopLogger() Logger                         { return nopLogger{} }
+func (nopLogger) Debug(format string, a ...any) { _ = format; _ = a }
+func (nopLogger) Info(format string, a ...any)  { _ = format; _ = a }
+func (nopLogger) Warn(format string, a ...any)  { _ = format; _ = a }

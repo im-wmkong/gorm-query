@@ -18,10 +18,6 @@ type user struct {
 	Status   int    `gorm:"column:status;default:1"` // 1: 活跃, 0: 非活跃
 }
 
-func (u *user) TableName() string {
-	return "users"
-}
-
 func TestGormxBuildNested(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "db")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
