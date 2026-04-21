@@ -1,10 +1,8 @@
-package column_test
+package column
 
 import (
 	"testing"
 
-	"github.com/im-wmkong/gorm-query/internal/column"
-	"github.com/im-wmkong/gorm-query/query"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,30 +14,28 @@ func (s stringerValue) String() string {
 
 func TestColumn(t *testing.T) {
 	t.Run("Value and Values unwrap stringer", func(t *testing.T) {
-		args := []any{query.Column("user_name"), stringerValue("status"), 42}
+		args := []any{stringerValue("status"), 42}
 
-		assert.Equal(t, "user_name", column.Value(args[0]))
-		assert.Equal(t, "status", column.Value(args[1]))
-		assert.Equal(t, 42, column.Value(args[2]))
-		assert.Equal(t, []any{"user_name", "status", 42}, column.Values(args))
-		assert.Nil(t, column.Values(nil))
+		assert.Equal(t, "status", Value(args[0]))
+		assert.Equal(t, 42, Value(args[1]))
+		assert.Equal(t, []any{"status", 42}, Values(args))
+		assert.Nil(t, Values(nil))
 	})
 
 	t.Run("ValueTo and ValuesTo keep zero values on mismatch", func(t *testing.T) {
-		assert.Equal(t, "age", column.ValueTo[string](query.Column("age")))
-		assert.Equal(t, "name", column.ValueTo[string](stringerValue("name")))
-		assert.Equal(t, "123", column.ValueTo[string](123))
-		assert.Equal(t, []string{"id", "status", "10"}, column.ValuesTo[string]([]any{query.Column("id"), stringerValue("status"), 10}))
-		assert.Nil(t, column.ValuesTo[string](nil))
+		assert.Equal(t, "name", ValueTo[string](stringerValue("name")))
+		assert.Equal(t, "123", ValueTo[string](123))
+		assert.Equal(t, []string{"status", "10"}, ValuesTo[string]([]any{stringerValue("status"), 10}))
+		assert.Nil(t, ValuesTo[string](nil))
 	})
 
 	t.Run("ToStringMap converts map to string values", func(t *testing.T) {
-		values := map[query.Column]int{
-			query.Column("age"):    18,
-			query.Column("status"): 1,
+		values := map[stringerValue]int{
+			stringerValue("age"):    18,
+			stringerValue("status"): 1,
 		}
 
-		assert.Equal(t, map[string]int{"age": 18, "status": 1}, column.ToStringMap(values))
-		assert.Empty(t, column.ToStringMap(map[query.Column]int(nil)))
+		assert.Equal(t, map[string]int{"age": 18, "status": 1}, ToStringMap(values))
+		assert.Empty(t, ToStringMap(map[stringerValue]int(nil)))
 	})
 }
