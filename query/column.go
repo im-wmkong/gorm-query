@@ -165,12 +165,11 @@ func (c Column) between(op string, start, end any) Condition {
 }
 
 func (c Column) clause(suffix string, args ...any) Condition {
-	if len(args) == 0 {
-		return func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if len(args) == 0 {
 			return db.Where(c.String() + " " + suffix)
 		}
-	}
-	return func(db *gorm.DB) *gorm.DB {
+
 		resolved := make([]any, len(args))
 		for i, arg := range args {
 			if col, ok := arg.(Column); ok {
