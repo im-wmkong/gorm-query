@@ -42,6 +42,22 @@ func (l *testLogger) Debug(string, ...any) { l.debugCalls++ }
 func (l *testLogger) Info(string, ...any)  { l.infoCalls++ }
 func (l *testLogger) Warn(string, ...any)  { l.warnCalls++ }
 
+func TestFilterNilModels(t *testing.T) {
+	filtered, nilCount := New().filterNilModels([]any{nil, &user{}, nil, &localGenPropsModel{}})
+	require.Len(t, filtered, 2)
+	assert.Equal(t, 2, nilCount)
+	assert.IsType(t, &user{}, filtered[0])
+	assert.IsType(t, &localGenPropsModel{}, filtered[1])
+}
+
+func TestGeneratorResolvePackageName(t *testing.T) {
+	g := New()
+
+	pkgName, err := g.packageName([]any{&user{}, &localGenPropsModel{}})
+	require.NoError(t, err)
+	assert.Equal(t, "genprops", pkgName)
+}
+
 func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	outDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outDir, "ignored_test.go"), []byte("package ignored\n"), 0644))
