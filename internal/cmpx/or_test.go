@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type contextKey string
+
 func TestOr(t *testing.T) {
 	t.Run("returns first non-zero int", func(t *testing.T) {
 		assert.Equal(t, 3, Or(0, 0, 3, 4))
@@ -28,7 +30,7 @@ func TestOr(t *testing.T) {
 	})
 
 	t.Run("supports interface values like context", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), "k", "v")
+		ctx := context.WithValue(context.Background(), contextKey("k"), "v")
 		assert.Same(t, ctx, Or[context.Context](nil, ctx, context.TODO()))
 	})
 

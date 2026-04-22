@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,26 @@ func openTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	require.NoError(t, gormDB.AutoMigrate(&user{}))
 	return gormDB
+}
+
+func callDBWithNilContext(t *testing.T, client *Client) *gorm.DB {
+	t.Helper()
+	results := reflect.ValueOf(client).MethodByName("DB").Call([]reflect.Value{
+		reflect.Zero(reflect.TypeOf((*context.Context)(nil)).Elem()),
+	})
+	return results[0].Interface().(*gorm.DB)
+}
+
+func callTransactionWithNilContext(t *testing.T, client *Client, fn func(context.Context) error) error {
+	t.Helper()
+	results := reflect.ValueOf(client).MethodByName("Transaction").Call([]reflect.Value{
+		reflect.Zero(reflect.TypeOf((*context.Context)(nil)).Elem()),
+		reflect.ValueOf(fn),
+	})
+	if results[0].IsNil() {
+		return nil
+	}
+	return results[0].Interface().(error)
 }
 
 // TestDB_WithoutTransaction verifies that DB(ctx) returns a normal connection without a transaction.
@@ -136,7 +157,7 @@ func TestDB_NilContextFallsBackToBackground(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
 
-	session := client.DB(nil)
+	session := callDBWithNilContext(t, client)
 	require.NotNil(t, session)
 	require.NoError(t, session.Create(&user{UserName: "nilctx", Email: "nil@t.com", Age: 1}).Error)
 
@@ -149,7 +170,7 @@ func TestDB_TransactionWithNilContext(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
 
-	err := client.Transaction(nil, func(txCtx context.Context) error {
+	err := callTransactionWithNilContext(t, client, func(txCtx context.Context) error {
 		require.NotNil(t, txCtx)
 		return client.DB(txCtx).Create(&user{UserName: "txnil", Email: "txnil@t.com", Age: 1}).Error
 	})
