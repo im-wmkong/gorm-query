@@ -31,7 +31,7 @@ func openTestDB(t *testing.T) *gorm.DB {
 	return gormDB
 }
 
-// TestDB_WithoutTransaction 验证无事务时 DB(ctx) 返回普通连接
+// TestDB_WithoutTransaction verifies that DB(ctx) returns a normal connection without a transaction.
 func TestDB_WithoutTransaction(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
@@ -40,7 +40,7 @@ func TestDB_WithoutTransaction(t *testing.T) {
 	session := client.DB(ctx)
 	require.NotNil(t, session)
 
-	// 正常 CRUD 可用
+	// Basic CRUD should work.
 	err := session.Create(&user{UserName: "test", Email: "t@t.com", Age: 1}).Error
 	require.NoError(t, err)
 
@@ -49,7 +49,7 @@ func TestDB_WithoutTransaction(t *testing.T) {
 	assert.Equal(t, int64(1), count)
 }
 
-// TestDB_InsideTransaction 验证事务上下文中 DB(ctx) 返回事务连接
+// TestDB_InsideTransaction verifies that DB(ctx) returns a transactional connection inside Transaction.
 func TestDB_InsideTransaction(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
@@ -63,13 +63,13 @@ func TestDB_InsideTransaction(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// 事务提交后数据可见
+	// Data should be visible after commit.
 	var count int64
 	require.NoError(t, client.DB(ctx).Model(&user{}).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
 }
 
-// TestDB_TransactionRollback 验证 fn 返回 error 时事务回滚
+// TestDB_TransactionRollback verifies that returning an error from fn triggers rollback.
 func TestDB_TransactionRollback(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
@@ -83,13 +83,13 @@ func TestDB_TransactionRollback(t *testing.T) {
 	})
 	require.ErrorIs(t, err, expectedErr)
 
-	// 回滚后数据不可见
+	// Data should not be visible after rollback.
 	var count int64
 	require.NoError(t, client.DB(ctx).Model(&user{}).Count(&count).Error)
 	assert.Equal(t, int64(0), count)
 }
 
-// TestDB_NestedTransaction 验证嵌套事务（GORM SavePoint）
+// TestDB_NestedTransaction verifies nested transactions (GORM savepoints).
 func TestDB_NestedTransaction(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
@@ -98,35 +98,36 @@ func TestDB_NestedTransaction(t *testing.T) {
 	err := client.Transaction(ctx, func(outerCtx context.Context) error {
 		_ = client.DB(outerCtx).Create(&user{UserName: "outer", Email: "o@t.com", Age: 1}).Error
 
-		// 内层事务失败并回滚
+		// Inner transaction fails and rolls back.
 		innerErr := client.Transaction(outerCtx, func(innerCtx context.Context) error {
 			_ = client.DB(innerCtx).Create(&user{UserName: "inner", Email: "i@t.com", Age: 1}).Error
 			return errors.New("inner fail")
 		})
 		require.Error(t, innerErr)
 
-		return nil // 外层提交
+		return nil // Outer transaction commits.
 	})
 	require.NoError(t, err)
 
-	// 外层数据可见，内层数据已回滚
+	// Outer data is visible; inner data has been rolled back.
 	var count int64
 	require.NoError(t, client.DB(ctx).Model(&user{}).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
 }
 
-// TestDB_ContextValueNotGormDB 验证 context 中 txKey 值类型不匹配时的兜底
+// TestDB_ContextValueNotGormDB verifies the fallback when ctx contains a txKey value of a wrong type.
 func TestDB_ContextValueNotGormDB(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
 
-	// 无法直接设置 txKey（未导出），但我们可以通过验证正常 context 不会误触发来确认安全性
-	// 在正常使用中，只有 Transaction 方法会设置 txKey，所以此测试确认普通 context 不会出问题
+	// We cannot set txKey directly (unexported), but we can validate that a normal context
+	// will not accidentally trigger transactional behavior.
+	// In real usage, only Transaction sets txKey.
 	ctx := context.WithValue(context.Background(), struct{ name string }{"unrelated"}, "value")
 	session := client.DB(ctx)
 	require.NotNil(t, session)
 
-	// 应该返回普通连接，不会 panic
+	// Should return a normal connection and must not panic.
 	var count int64
 	require.NoError(t, session.Model(&user{}).Count(&count).Error)
 }

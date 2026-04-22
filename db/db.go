@@ -1,7 +1,8 @@
-// Package db 提供了基于 context.Context 的 GORM 数据库连接与事务管理能力。
+// Package db provides context-aware GORM database access and transaction management.
 //
-// 它定义了 DBProvider 和 Transactor 接口，使得业务的 Service 层可以
-// 在不感知底层 *gorm.DB 实例的情况下开启和传递事务，从而实现 Repo 层与 Service 层的完美解耦。
+// It defines the DBProvider and Transactor interfaces so the Service layer can
+// start and propagate transactions without directly depending on *gorm.DB,
+// keeping the Repo layer decoupled from the Service layer.
 package db
 
 import (
@@ -14,12 +15,12 @@ type txKeyType struct{}
 
 var txKey = txKeyType{}
 
-// DBProvider 定义了数据库连接的接口
+// DBProvider provides a *gorm.DB bound to the given context.
 type DBProvider interface {
 	DB(ctx context.Context) *gorm.DB
 }
 
-// Transactor 定义了数据库事务管理的接口
+// Transactor provides context-aware transaction management.
 type Transactor interface {
 	Transaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
@@ -32,7 +33,13 @@ type Client struct {
 	db *gorm.DB
 }
 
-// NewClient 创建一个新的 Client 实例。db 不能为 nil，否则 panic。
+// NewClient creates a new Client instance. db must not be nil, otherwise it panics.
+//
+// Example:
+//
+//	gormDB, _ := gorm.Open(...)
+//	client := db.NewClient(gormDB)
+//	_ = client
 func NewClient(db *gorm.DB) *Client {
 	if db == nil {
 		panic("db: NewClient called with nil *gorm.DB")
@@ -40,7 +47,13 @@ func NewClient(db *gorm.DB) *Client {
 	return &Client{db: db}
 }
 
-// DB 返回当前上下文的 GORM DB 实例
+// DB returns the GORM DB instance for the given context.
+//
+// Example:
+//
+//	ctx := context.Background()
+//	session := client.DB(ctx)
+//	_ = session
 func (c *Client) DB(ctx context.Context) *gorm.DB {
 	v := ctx.Value(txKey)
 	if v != nil {
@@ -51,7 +64,15 @@ func (c *Client) DB(ctx context.Context) *gorm.DB {
 	return c.db.WithContext(ctx)
 }
 
-// Transaction 在当前上下文开启一个新的数据库事务
+// Transaction starts a new transaction and passes a transaction-aware context to fn.
+//
+// Example:
+//
+//	err := client.Transaction(ctx, func(txCtx context.Context) error {
+//	    // Any repo/db call using txCtx will use the same transaction.
+//	    return nil
+//	})
+//	_ = err
 func (c *Client) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return c.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		txCtx := context.WithValue(ctx, txKey, tx)

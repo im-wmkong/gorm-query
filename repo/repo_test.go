@@ -80,7 +80,7 @@ func TestBaseRepository_CRUD(t *testing.T) {
 	require.NotNil(t, alice)
 	assert.Equal(t, "alice@example.com", alice.Email)
 
-	// Last (按主键降序)
+	// Last (primary key descending)
 	last, err := r.Last(ctx, query.New())
 	require.NoError(t, err)
 	require.NotNil(t, last)

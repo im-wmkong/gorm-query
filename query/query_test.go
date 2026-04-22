@@ -66,7 +66,7 @@ func seedUsers(t *testing.T, db *gorm.DB) {
 	}
 	for _, u := range users {
 		require.NoError(t, db.Create(u).Error)
-		// 确保 created_at 有可排序差异
+		// Ensure created_at has sortable differences.
 		time.Sleep(1 * time.Millisecond)
 	}
 }
@@ -437,7 +437,7 @@ func TestQuery_SelectHelpers_AsAndAgg(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	// Email.As("user_name")：把 email 列映射到 UserName 字段
+	// Email.As("user_name"): map the email column to the UserName field.
 	qAs := New().Select(userProps.Email.As("user_name")).Where(userProps.UserName.Eq("Alice"))
 	u, err := applyFirst(t, db, qAs)
 	require.NoError(t, err)
@@ -456,14 +456,14 @@ func TestQuery_OmitAndOrder_InvalidTypeAreSafe(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	// Omit(123) 只会产生一个无效字段名，不应影响正常查询
+	// Omit(123) only produces an invalid column name and should not break normal queries.
 	qOmitInvalid := New().Omit(123).Where(userProps.UserName.Eq("Alice"))
 	u, err := applyFirst(t, db, qOmitInvalid)
 	require.NoError(t, err)
 	require.NotNil(t, u)
 	assert.Equal(t, "alice@example.com", u.Email)
 
-	// Order(123) 在 GORM 中等价于 ORDER BY 123（合法常量表达式），应可执行
+	// Order(123) is equivalent to ORDER BY 123 in GORM (a valid constant expression) and should run.
 	qOrderInvalid := New().Order(123).Where(userProps.UserName.Eq("Alice"))
 	u, err = applyFirst(t, db, qOrderInvalid)
 	require.NoError(t, err)

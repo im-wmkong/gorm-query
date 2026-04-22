@@ -5,22 +5,27 @@ import (
 	"os"
 )
 
-// Logger 定义了 genprops 生成器使用的日志接口。
+// Logger defines the logging interface used by the genprops generator.
 type Logger interface {
-	// Debug 输出调试级别的日志，用于过程性细节信息。
+	// Debug logs debug-level messages.
 	Debug(format string, a ...any)
-	// Info 输出信息级别的日志，用于关键操作的结果通知。
+	// Info logs informational messages for key operations.
 	Info(format string, a ...any)
-	// Warn 输出警告级别的日志，用于非致命的异常情况。
+	// Warn logs warning messages for non-fatal conditions.
 	Warn(format string, a ...any)
 }
 
-// defaultLogger 基于标准库 log 的默认实现，输出到 stderr。
+// defaultLogger is the standard-library log based implementation (stderr).
 type defaultLogger struct {
 	l *log.Logger
 }
 
-// NewDefaultLogger 创建一个输出到 stderr 的默认 Logger。
+// NewDefaultLogger creates a default Logger that writes to stderr.
+//
+// Example:
+//
+//	g := genprops.New(genprops.WithLogger(genprops.NewDefaultLogger()))
+//	_ = g
 func NewDefaultLogger() Logger {
 	return &defaultLogger{l: log.New(os.Stderr, "[genprops] ", log.LstdFlags)}
 }
@@ -29,10 +34,15 @@ func (d *defaultLogger) Debug(format string, a ...any) { d.l.Printf("[DEBUG] "+f
 func (d *defaultLogger) Info(format string, a ...any)  { d.l.Printf("[INFO]  "+format, a...) }
 func (d *defaultLogger) Warn(format string, a ...any)  { d.l.Printf("[WARN]  "+format, a...) }
 
-// nopLogger 不输出任何日志。
+// nopLogger discards all logs.
 type nopLogger struct{}
 
-// NopLogger 返回一个静默的 Logger，不输出任何日志。
+// NopLogger returns a Logger that discards all logs.
+//
+// Example:
+//
+//	g := genprops.New(genprops.WithLogger(genprops.NopLogger()))
+//	_ = g
 func NopLogger() Logger                         { return nopLogger{} }
 func (nopLogger) Debug(format string, a ...any) { _ = format; _ = a }
 func (nopLogger) Info(format string, a ...any)  { _ = format; _ = a }

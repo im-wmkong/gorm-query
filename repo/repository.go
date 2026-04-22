@@ -1,8 +1,8 @@
-// Package repo 提供了一个基于泛型的企业级 GORM 通用仓储（Repository）实现。
+// Package repo provides a generic GORM repository implementation.
 //
-// BaseRepository[T] 封装了最常用的 CRUD 操作（如 Create, Update, Find, Count 等）。
-// 结合 db 包的 DBProvider，它能够自动感知上下文中的事务；
-// 结合 query 包的 Builder，它能够接收强类型的查询条件，彻底消除魔法字符串。
+// BaseRepository[T] wraps the most common CRUD operations (Create, Update, Find, Count, etc.).
+// With db.DBProvider it can automatically pick up transactions from context;
+// with query.Builder it can accept type-safe query conditions to avoid magic strings.
 package repo
 
 import (
@@ -15,8 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Repository 定义了通用的仓储接口
-// T 是 Model 类型
+// Repository defines a generic repository interface.
+// T is the model type.
 type Repository[T any] interface {
 	DB(ctx context.Context) *gorm.DB
 	Save(ctx context.Context, entity *T) error
@@ -39,12 +39,22 @@ type BaseRepository[T any] struct {
 	dbProvider db.DBProvider
 }
 
-// New 创建一个新的 BaseRepository 实例
+// New creates a new BaseRepository.
+//
+// Example:
+//
+//	r := repo.New[User](dbClient) // dbClient implements db.DBProvider
+//	_ = r
 func New[T any](dbProvider db.DBProvider) *BaseRepository[T] {
 	return &BaseRepository[T]{dbProvider: dbProvider}
 }
 
-// DB 返回当前上下文的 GORM DB 实例
+// DB returns the GORM DB instance for the given context.
+//
+// Example:
+//
+//	session := r.DB(ctx)
+//	_ = session
 func (r *BaseRepository[T]) DB(ctx context.Context) *gorm.DB {
 	return r.dbProvider.DB(ctx)
 }
@@ -58,29 +68,56 @@ func (r *BaseRepository[T]) buildQuery(ctx context.Context, qb *query.Builder) *
 	return session
 }
 
-// Save 保存记录
+// Save persists the entity (insert or update).
+//
+// Example:
+//
+//	err := r.Save(ctx, &User{ID: 1, UserName: "Alice"})
+//	_ = err
 func (r *BaseRepository[T]) Save(ctx context.Context, entity *T) error {
 	return r.DB(ctx).Save(entity).Error
 }
 
-// Create 创建一个新记录
+// Create inserts a new entity.
+//
+// Example:
+//
+//	err := r.Create(ctx, &User{UserName: "Alice"})
+//	_ = err
 func (r *BaseRepository[T]) Create(ctx context.Context, entity *T) error {
 	return r.DB(ctx).Create(entity).Error
 }
 
-// CreateInBatches 创建多条记录
+// CreateInBatches inserts multiple entities in batches.
+//
+// Example:
+//
+//	rows, err := r.CreateInBatches(ctx, []*User{{UserName: "A"}, {UserName: "B"}}, 100)
+//	_, _ = rows, err
 func (r *BaseRepository[T]) CreateInBatches(ctx context.Context, entities []*T, batchSize int) (int64, error) {
 	result := r.DB(ctx).CreateInBatches(entities, batchSize)
 	return result.RowsAffected, result.Error
 }
 
-// Update 更新记录的指定字段
+// Update updates a single column for matched records.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.ID.Eq(1))
+//	rows, err := r.Update(ctx, qb, UserProps.Status, 2)
+//	_, _ = rows, err
 func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, column query.Column, value any) (int64, error) {
 	result := r.buildQuery(ctx, qb).Update(column.String(), value)
 	return result.RowsAffected, result.Error
 }
 
-// Updates 更新记录的多个字段
+// Updates updates multiple columns for matched records.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.ID.Eq(1))
+//	rows, err := r.Updates(ctx, qb, map[query.Column]any{UserProps.Status: 2, UserProps.Email: "a@b.com"})
+//	_, _ = rows, err
 func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values any) (int64, error) {
 	if mapVals, ok := values.(map[query.Column]any); ok {
 		values = column.ToStringMap(mapVals)
@@ -89,21 +126,40 @@ func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, valu
 	return result.RowsAffected, result.Error
 }
 
-// Delete 删除记录
+// Delete deletes matched records.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.ID.Eq(1))
+//	rows, err := r.Delete(ctx, qb)
+//	_, _ = rows, err
 func (r *BaseRepository[T]) Delete(ctx context.Context, qb *query.Builder) (int64, error) {
 	var entity T
 	result := r.buildQuery(ctx, qb).Delete(&entity)
 	return result.RowsAffected, result.Error
 }
 
-// Find 查询多条记录
+// Find returns matched records.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Status.Eq(1)).Order(UserProps.CreatedAt.Desc())
+//	users, err := r.Find(ctx, qb)
+//	_, _ = users, err
 func (r *BaseRepository[T]) Find(ctx context.Context, qb *query.Builder) ([]*T, error) {
 	var entities []*T
 	err := r.buildQuery(ctx, qb).Find(&entities).Error
 	return entities, err
 }
 
-// First 获取第一条记录（主键升序）。未找到时返回 (nil, error)。
+// First returns the first matched record (primary key ascending).
+// When not found, it returns (nil, error).
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Email.Eq("alice@example.com"))
+//	user, err := r.First(ctx, qb)
+//	_, _ = user, err
 func (r *BaseRepository[T]) First(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
 	err := r.buildQuery(ctx, qb).First(&entity).Error
@@ -113,7 +169,13 @@ func (r *BaseRepository[T]) First(ctx context.Context, qb *query.Builder) (*T, e
 	return &entity, nil
 }
 
-// Take 获取一条记录，没有指定排序字段。未找到时返回 (nil, error)。
+// Take returns one matched record without specifying order.
+// When not found, it returns (nil, error).
+//
+// Example:
+//
+//	user, err := r.Take(ctx, query.New().Where(UserProps.ID.Eq(1)))
+//	_, _ = user, err
 func (r *BaseRepository[T]) Take(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
 	err := r.buildQuery(ctx, qb).Take(&entity).Error
@@ -123,7 +185,13 @@ func (r *BaseRepository[T]) Take(ctx context.Context, qb *query.Builder) (*T, er
 	return &entity, nil
 }
 
-// Last 获取最后一条记录（主键降序）。未找到时返回 (nil, error)。
+// Last returns the last matched record (primary key descending).
+// When not found, it returns (nil, error).
+//
+// Example:
+//
+//	user, err := r.Last(ctx, query.New())
+//	_, _ = user, err
 func (r *BaseRepository[T]) Last(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
 	err := r.buildQuery(ctx, qb).Last(&entity).Error
@@ -133,14 +201,25 @@ func (r *BaseRepository[T]) Last(ctx context.Context, qb *query.Builder) (*T, er
 	return &entity, nil
 }
 
-// Count 查询记录数
+// Count returns the count of matched records.
+//
+// Example:
+//
+//	n, err := r.Count(ctx, query.New().Where(UserProps.Status.Eq(1)))
+//	_, _ = n, err
 func (r *BaseRepository[T]) Count(ctx context.Context, qb *query.Builder) (int64, error) {
 	var count int64
 	err := r.buildQuery(ctx, qb).Count(&count).Error
 	return count, err
 }
 
-// Pluck 获取记录的指定字段值
+// Pluck selects a single column into dest.
+//
+// Example:
+//
+//	var emails []string
+//	err := r.Pluck(ctx, query.New().Where(UserProps.Status.Eq(1)), UserProps.Email, &emails)
+//	_ = err
 func (r *BaseRepository[T]) Pluck(ctx context.Context, qb *query.Builder, column query.Column, dest any) error {
 	return r.buildQuery(ctx, qb).Pluck(column.String(), dest).Error
 }

@@ -2,16 +2,16 @@ package model
 
 import "gorm.io/gorm"
 
-// User 定义了用户模型
+// User defines the demo user model.
 type User struct {
 	gorm.Model
 	UserName string `gorm:"column:user_name;size:255;not null"`
 	Email    string `gorm:"column:email;size:255;unique"`
 	Age      int    `gorm:"column:age"`
-	Status   int    `gorm:"column:status;default:1"` // 1: 活跃, 0: 非活跃
+	Status   int    `gorm:"column:status;default:1"` // 1: active, 0: inactive
 }
 
-// TableName 将 User 使用的表名覆盖为 `users`
+// TableName overrides the default table name to `users`.
 func (u *User) TableName() string {
 	return "users"
 }

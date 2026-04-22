@@ -17,7 +17,7 @@ type user struct {
 	UserName string `gorm:"column:user_name;size:255;not null"`
 	Email    string `gorm:"column:email;size:255;unique"`
 	Age      int    `gorm:"column:age"`
-	Status   int    `gorm:"column:status;default:1"` // 1: 活跃, 0: 非活跃
+	Status   int    `gorm:"column:status;default:1"` // 1: active, 0: inactive
 }
 
 type localGenPropsModel struct {
@@ -76,16 +76,17 @@ func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	assert.Contains(t, generated, `import query "github.com/im-wmkong/gorm-query/query"`)
 	assert.Equal(t, 1, strings.Count(generated, "var userProps = struct"))
 
-	// 首次生成：Info 包含 "generating props..." 和 "generated ..."
+	// First run: Info contains "generating props..." and "generated ...".
 	assert.Equal(t, 2, tl.infoCalls)
-	// 重复 User 触发一次 Warn
+	// Duplicate user triggers one Warn.
 	assert.Equal(t, 1, tl.warnCalls)
 	assert.Greater(t, tl.debugCalls, 0)
 
 	prevInfo := tl.infoCalls
 	err = g.Generate(&user{})
 	require.NoError(t, err)
-	// 幂等：内容未变，跳过写入只产生 Debug，Info 不再增加（除了 "generating props..."）
+	// Idempotent: unchanged content skips writing; only Debug is emitted.
+	// Info should not increase except "generating props...".
 	assert.Equal(t, prevInfo+1, tl.infoCalls)
 }
 
@@ -161,7 +162,8 @@ func TestGenPropsGenerate_DryRun(t *testing.T) {
 	require.NoError(t, dryRunGenerator.Generate(&user{}))
 
 	propsFile := filepath.Join(outDir, "props_gen.go")
-	// 保持 outputDir 的 package 与自动推导的包名一致，否则会在 dry-run 比对前被 package mismatch 拦截。
+	// Keep the package in outputDir consistent with the auto-detected package name;
+	// otherwise dry-run will fail earlier due to package mismatch.
 	require.NoError(t, os.WriteFile(propsFile, []byte("package genprops\n"), 0644))
 
 	err := dryRunGenerator.Generate(&user{})
@@ -188,8 +190,9 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 	})
 
 	t.Run("mixed packages without explicit package name", func(t *testing.T) {
-		// 第二个参数使用匿名 struct（reflect.Type.PkgPath() == ""），用于模拟不同 package
-		// 以触发“所有 model 必须同包”的校验，而无需依赖 example/model。
+		// Use an anonymous struct as the second arg (reflect.Type.PkgPath() == "") to simulate
+		// a different package and trigger the "all models must be in the same package" validation
+		// without depending on example/model.
 		err := New(WithOutputDir(t.TempDir())).Generate(&user{}, &struct{ ID uint }{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "all models must be in the same package")

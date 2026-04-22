@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cast"
 )
 
-// Value 解析参数
+// Value resolves an argument: if it implements fmt.Stringer, use its string form.
 func Value(v any) any {
 	if e, ok := v.(fmt.Stringer); ok {
 		return e.String()
@@ -16,22 +16,22 @@ func Value(v any) any {
 	return v
 }
 
-// Values 解析参数列表
+// Values resolves a list of arguments.
 func Values(args []any) []any {
 	return slicex.Map(args, Value)
 }
 
-// ValueTo 解析参数为指定类型
+// ValueTo resolves an argument and casts it to the specified basic type.
 func ValueTo[T cast.Basic](v any) T {
 	return cast.To[T](Value(v))
 }
 
-// ValuesTo 解析参数列表为指定类型
+// ValuesTo resolves a list of arguments and casts them to the specified basic type.
 func ValuesTo[T cast.Basic](args []any) []T {
 	return slicex.Map(args, ValueTo[T])
 }
 
-// ToStringMap 转换 map[K]V 到 map[string]V
+// ToStringMap converts map[K]V to map[string]V.
 func ToStringMap[K ~string, V any](values map[K]V) map[string]V {
 	return mapx.MapKeys(values, func(k K) string {
 		return string(k)

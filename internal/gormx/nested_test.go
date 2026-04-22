@@ -15,7 +15,7 @@ type user struct {
 	UserName string `gorm:"column:user_name;size:255;not null"`
 	Email    string `gorm:"column:email;size:255;unique"`
 	Age      int    `gorm:"column:age"`
-	Status   int    `gorm:"column:status;default:1"` // 1: 活跃, 0: 非活跃
+	Status   int    `gorm:"column:status;default:1"`
 }
 
 func TestGormxBuildNested(t *testing.T) {

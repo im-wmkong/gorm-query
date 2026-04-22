@@ -6,152 +6,309 @@ import (
 	"gorm.io/gorm"
 )
 
-// Column 代表数据库中的列名
+// Column represents a database column name.
+//
+// Example:
+//
+//	// WHERE age >= 18 AND email LIKE "%@example.com%"
+//	qb := query.New().Where(
+//	    UserProps.Age.Gte(18),
+//	    UserProps.Email.Like("%@example.com%"),
+//	)
+//
+//	// ORDER BY created_at DESC
+//	qb = qb.Order(UserProps.CreatedAt.Desc())
+//	_ = qb
 type Column string
 
 var _ fmt.Stringer = (*Column)(nil)
 
-// String 转换为字符串 (Field)
+// String returns the column as string.
+//
+// Example:
+//
+//	s := UserProps.Email.String()
+//	_ = s
 func (c Column) String() string {
 	return string(c)
 }
 
-// Eq 等于 (Field = Value)
+// Eq builds an equality condition: column = value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.ID.Eq(1))
+//	_ = qb
 func (c Column) Eq(val any) Condition {
 	return c.compare("=", val)
 }
 
-// Neq 不等于 (Field <> Value)
+// Neq builds an inequality condition: column <> value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Status.Neq(0))
+//	_ = qb
 func (c Column) Neq(val any) Condition {
 	return c.compare("<>", val)
 }
 
-// Gt 大于 (Field > Value)
+// Gt builds a greater-than condition: column > value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Age.Gt(18))
+//	_ = qb
 func (c Column) Gt(val any) Condition {
 	return c.compare(">", val)
 }
 
-// Gte 大于等于 (Field >= Value)
+// Gte builds a greater-than-or-equal condition: column >= value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Age.Gte(18))
+//	_ = qb
 func (c Column) Gte(val any) Condition {
 	return c.compare(">=", val)
 }
 
-// Lt 小于 (Field < Value)
+// Lt builds a less-than condition: column < value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Age.Lt(65))
+//	_ = qb
 func (c Column) Lt(val any) Condition {
 	return c.compare("<", val)
 }
 
-// Lte 小于等于 (Field <= Value)
+// Lte builds a less-than-or-equal condition: column <= value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Age.Lte(65))
+//	_ = qb
 func (c Column) Lte(val any) Condition {
 	return c.compare("<=", val)
 }
 
-// Like 模糊查询 (Field LIKE Value)
+// Like builds a LIKE condition: column LIKE value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Email.Like("%@example.com%"))
+//	_ = qb
 func (c Column) Like(val any) Condition {
 	return c.compare("LIKE", val)
 }
 
-// NotLike 模糊查询否定 (Field NOT LIKE Value)
+// NotLike builds a NOT LIKE condition: column NOT LIKE value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Email.NotLike("%@example.com%"))
+//	_ = qb
 func (c Column) NotLike(val any) Condition {
 	return c.compare("NOT LIKE", val)
 }
 
-// Contains 包含匹配 (Field LIKE %Value%)
+// Contains builds a LIKE condition: column LIKE %value%.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.UserName.Contains("li"))
+//	_ = qb
 func (c Column) Contains(val string) Condition {
 	return c.compare("LIKE", "%"+val+"%")
 }
 
-// NotContains 不包含匹配 (Field NOT LIKE %Value%)
+// NotContains builds a NOT LIKE condition: column NOT LIKE %value%.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.UserName.NotContains("admin"))
+//	_ = qb
 func (c Column) NotContains(val string) Condition {
 	return c.compare("NOT LIKE", "%"+val+"%")
 }
 
-// HasPrefix 前缀匹配 (Field LIKE Value%)
+// HasPrefix builds a LIKE condition: column LIKE value%.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.UserName.HasPrefix("Al"))
+//	_ = qb
 func (c Column) HasPrefix(val string) Condition {
 	return c.compare("LIKE", val+"%")
 }
 
-// HasSuffix 后缀匹配 (Field LIKE %Value)
+// HasSuffix builds a LIKE condition: column LIKE %value.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.UserName.HasSuffix("son"))
+//	_ = qb
 func (c Column) HasSuffix(val string) Condition {
 	return c.compare("LIKE", "%"+val)
 }
 
-// In 包含 (Field IN Values)
+// In builds an IN condition: column IN (values).
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.UserName.In([]string{"Alice", "Bob"}))
+//	_ = qb
 func (c Column) In(vals any) Condition {
 	return c.compare("IN", vals)
 }
 
-// NotIn 不包含 (Field NOT IN Values)
+// NotIn builds a NOT IN condition: column NOT IN (values).
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.UserName.NotIn([]string{"admin", "root"}))
+//	_ = qb
 func (c Column) NotIn(vals any) Condition {
 	return c.compare("NOT IN", vals)
 }
 
-// Between 范围匹配 (Field BETWEEN Start AND End)
+// Between builds a BETWEEN condition: column BETWEEN start AND end.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Age.Between(18, 30))
+//	_ = qb
 func (c Column) Between(start, end any) Condition {
 	return c.between("BETWEEN", start, end)
 }
 
-// NotBetween 范围匹配否定 (Field NOT BETWEEN Start AND End)
+// NotBetween builds a NOT BETWEEN condition: column NOT BETWEEN start AND end.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.Age.NotBetween(18, 30))
+//	_ = qb
 func (c Column) NotBetween(start, end any) Condition {
 	return c.between("NOT BETWEEN", start, end)
 }
 
-// IsNull 为空 (Field IS NULL)
+// IsNull builds an IS NULL condition.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.DeletedAt.IsNull())
+//	_ = qb
 func (c Column) IsNull() Condition {
 	return c.clause("IS NULL")
 }
 
-// IsNotNull 不为空 (Field IS NOT NULL)
+// IsNotNull builds an IS NOT NULL condition.
+//
+// Example:
+//
+//	qb := query.New().Where(UserProps.DeletedAt.IsNotNull())
+//	_ = qb
 func (c Column) IsNotNull() Condition {
 	return c.clause("IS NOT NULL")
 }
 
-// Desc 降序 (Field DESC) (用于 Order By)
+// Desc returns an ORDER BY fragment: "column DESC".
+//
+// Example:
+//
+//	qb := query.New().Order(UserProps.CreatedAt.Desc())
+//	_ = qb
 func (c Column) Desc() string {
 	return c.String() + " DESC"
 }
 
-// Asc 升序 (Field ASC) (用于 Order By)
+// Asc returns an ORDER BY fragment: "column ASC".
+//
+// Example:
+//
+//	qb := query.New().Order(UserProps.CreatedAt.Asc())
+//	_ = qb
 func (c Column) Asc() string {
 	return c.String() + " ASC"
 }
 
-// Table 表名 (Table.Field) (用于 Select)
+// Table qualifies the column with table name: "table.column".
+//
+// Example:
+//
+//	col := UserProps.Email.Table("users")
+//	_ = col
 func (c Column) Table(name string) Column {
 	return Column(name + "." + c.String())
 }
 
-// As 别名 (Field AS Alias) (用于 Select)
+// As returns an aliased SELECT fragment: "column AS alias".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.Email.As("user_name"))
+//	_ = qb
 func (c Column) As(alias string) Column {
 	return Column(c.String() + " AS " + alias)
 }
 
-// Distinct 去重 (DISTINCT Field) (用于 Select)
+// Distinct returns a DISTINCT SELECT fragment: "DISTINCT column".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.Email.Distinct())
+//	_ = qb
 func (c Column) Distinct() Column {
 	return Column("DISTINCT " + c.String())
 }
 
-// Sum 求和 (SUM(Field)) (用于 Select)
+// Sum returns an aggregate SELECT fragment: "SUM(column)".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.Age.Sum().As("age_sum"))
+//	_ = qb
 func (c Column) Sum() Column {
 	return Column("SUM(" + c.String() + ")")
 }
 
-// Count 计数 (COUNT(Field)) (用于 Select)
+// Count returns an aggregate SELECT fragment: "COUNT(column)".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.ID.Count().As("cnt"))
+//	_ = qb
 func (c Column) Count() Column {
 	return Column("COUNT(" + c.String() + ")")
 }
 
-// Avg 平均值 (AVG(Field)) (用于 Select)
+// Avg returns an aggregate SELECT fragment: "AVG(column)".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.Age.Avg().As("age_avg"))
+//	_ = qb
 func (c Column) Avg() Column {
 	return Column("AVG(" + c.String() + ")")
 }
 
-// Max 最大值 (MAX(Field)) (用于 Select)
+// Max returns an aggregate SELECT fragment: "MAX(column)".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.Age.Max().As("age_max"))
+//	_ = qb
 func (c Column) Max() Column {
 	return Column("MAX(" + c.String() + ")")
 }
 
-// Min 最小值 (MIN(Field)) (用于 Select)
+// Min returns an aggregate SELECT fragment: "MIN(column)".
+//
+// Example:
+//
+//	qb := query.New().Select(UserProps.Age.Min().As("age_min"))
+//	_ = qb
 func (c Column) Min() Column {
 	return Column("MIN(" + c.String() + ")")
 }

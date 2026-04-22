@@ -1,10 +1,11 @@
-// Package genprops 是一个为 GORM 模型生成强类型属性代码的工具。
+// Package genprops generates type-safe property definitions for GORM models.
 //
-// 它通过 schema.Parse 函数解析 GORM 模型的字段，生成对应的强类型属性字典。
-// 这些属性字典可以用于构建查询条件，提供类型安全的 SQL 构建体验。
+// It parses GORM model fields via schema.Parse and generates a corresponding
+// typed property dictionary. These properties can be used to build query
+// conditions with a type-safe SQL-building experience.
 //
-// 它支持自定义命名策略，允许用户根据需要调整生成的代码的包名、文件名等。
-// 默认情况下，它会根据模型的包名和模型名自动生成属性字典的包名和文件名。
+// It supports a custom naming strategy and allows configuring the output package
+// name and file name. By default, it auto-detects them from the model package and name.
 package genprops
 
 import (
@@ -26,6 +27,15 @@ type Generator struct {
 	cfg config
 }
 
+// New creates a new Generator.
+//
+// Example:
+//
+//	g := genprops.New(
+//	    genprops.WithOutputDir("./model"),
+//	    genprops.WithOutputFile("props_gen.go"),
+//	)
+//	_ = g
 func New(opts ...Option) *Generator {
 	cfg := defaultConfig()
 	for _, opt := range opts {
@@ -34,8 +44,15 @@ func New(opts ...Option) *Generator {
 	return &Generator{cfg: cfg}
 }
 
+// Generate parses the given GORM models and generates a props file into outputDir.
+//
+// Example:
+//
+//	// Generate props into the same package as the models.
+//	err := genprops.New(genprops.WithOutputDir("./model")).Generate(&model.User{})
+//	_ = err
 func (g *Generator) Generate(models ...any) error {
-	// 过滤 nil 元素
+	// Filter out nil models.
 	filtered := make([]any, 0, len(models))
 	for _, model := range models {
 		if model != nil {
@@ -53,13 +70,13 @@ func (g *Generator) Generate(models ...any) error {
 		return fmt.Errorf("no models provided")
 	}
 
-	// 确定 packageName
+	// Determine package name.
 	pkgName := g.cfg.packageName
 	if pkgName == "" {
 		pkgName = reflectx.PackageName(models[0])
 		g.cfg.logger.Debug("auto-detected package name: %s", pkgName)
 
-		// 自动推导时校验同包
+		// When auto-detecting, ensure all models are in the same package.
 		for _, model := range models {
 			if reflectx.PackageName(model) != pkgName {
 				return fmt.Errorf("all models must be in the same package or explicitly set WithPackageName")
@@ -69,12 +86,12 @@ func (g *Generator) Generate(models ...any) error {
 		g.cfg.logger.Debug("using explicit package name: %s", pkgName)
 	}
 
-	// 确保目录存在
+	// Ensure the output directory exists.
 	if err := os.MkdirAll(g.cfg.outputDir, 0755); err != nil {
 		return fmt.Errorf("create output dir failed: %w", err)
 	}
 
-	// 检测目录已有 package
+	// Detect existing package name in outputDir.
 	detectedPkg, err := fsx.PackageNameFromDir(g.cfg.outputDir)
 	if err != nil {
 		return fmt.Errorf("detect package failed: %w", err)
@@ -87,7 +104,7 @@ func (g *Generator) Generate(models ...any) error {
 		)
 	}
 
-	// 生成代码
+	// Generate code.
 	g.cfg.logger.Info("generating props for %d model(s)", len(models))
 
 	f := jen.NewFile(pkgName)
@@ -107,7 +124,7 @@ func (g *Generator) Generate(models ...any) error {
 			continue
 		}
 
-		// 去重
+		// Deduplicate by model name.
 		if _, ok := seen[sch.Name]; ok {
 			g.cfg.logger.Warn("skipping duplicate model: %s", sch.Name)
 			continue
@@ -142,7 +159,7 @@ func (g *Generator) Generate(models ...any) error {
 		f.Line()
 	}
 
-	// 渲染代码
+	// Render code.
 	var buf bytes.Buffer
 	if err := f.Render(&buf); err != nil {
 		return fmt.Errorf("render failed: %w", err)
@@ -160,7 +177,7 @@ func (g *Generator) Generate(models ...any) error {
 		return nil
 	}
 
-	// 避免重复写
+	// Avoid rewriting unchanged content.
 	if old, err := os.ReadFile(filename); err == nil {
 		if bytes.Equal(old, buf.Bytes()) {
 			g.cfg.logger.Debug("skipped writing %s: content unchanged", filename)
@@ -168,7 +185,7 @@ func (g *Generator) Generate(models ...any) error {
 		}
 	}
 
-	// 写文件
+	// Write file.
 	if err := os.WriteFile(filename, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write file failed: %w", err)
 	}
