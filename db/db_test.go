@@ -132,6 +132,34 @@ func TestDB_ContextValueNotGormDB(t *testing.T) {
 	require.NoError(t, session.Model(&user{}).Count(&count).Error)
 }
 
+func TestDB_NilContextFallsBackToBackground(t *testing.T) {
+	gormDB := openTestDB(t)
+	client := NewClient(gormDB)
+
+	session := client.DB(nil)
+	require.NotNil(t, session)
+	require.NoError(t, session.Create(&user{UserName: "nilctx", Email: "nil@t.com", Age: 1}).Error)
+
+	var count int64
+	require.NoError(t, session.Model(&user{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestDB_TransactionWithNilContext(t *testing.T) {
+	gormDB := openTestDB(t)
+	client := NewClient(gormDB)
+
+	err := client.Transaction(nil, func(txCtx context.Context) error {
+		require.NotNil(t, txCtx)
+		return client.DB(txCtx).Create(&user{UserName: "txnil", Email: "txnil@t.com", Age: 1}).Error
+	})
+	require.NoError(t, err)
+
+	var count int64
+	require.NoError(t, client.DB(context.Background()).Model(&user{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+}
+
 func TestNewClient_PanicsOnNilDB(t *testing.T) {
 	require.PanicsWithValue(t, "db: NewClient called with nil *gorm.DB", func() {
 		_ = NewClient(nil)
