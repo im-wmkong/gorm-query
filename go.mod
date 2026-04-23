@@ -2,6 +2,8 @@ module github.com/im-wmkong/gorm-query
 
 go 1.21.0
 
+retract v1.0.0 - v1.3.999
+
 require (
 	github.com/dave/jennifer v1.7.1
 	github.com/spf13/cast v1.10.0
