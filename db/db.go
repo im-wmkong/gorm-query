@@ -8,7 +8,6 @@ package db
 import (
 	"context"
 
-	"github.com/im-wmkong/gorm-query/internal/cmpx"
 	"gorm.io/gorm"
 )
 
@@ -56,7 +55,6 @@ func NewClient(db *gorm.DB) *Client {
 //	session := client.DB(ctx)
 //	_ = session
 func (c *Client) DB(ctx context.Context) *gorm.DB {
-	ctx = cmpx.Or(ctx, context.Background())
 	v := ctx.Value(txKey)
 	if v != nil {
 		if tx, ok := v.(*gorm.DB); ok {
@@ -76,7 +74,6 @@ func (c *Client) DB(ctx context.Context) *gorm.DB {
 //	})
 //	_ = err
 func (c *Client) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	ctx = cmpx.Or(ctx, context.Background())
 	return c.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		txCtx := context.WithValue(ctx, txKey, tx)
 		return fn(txCtx)
