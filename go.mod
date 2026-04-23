@@ -2,7 +2,12 @@ module github.com/im-wmkong/gorm-query
 
 go 1.21.0
 
-retract v1.0.0 - v1.3.999
+retract (
+	v1.0.0
+	v1.1.0
+	v1.2.0
+	v1.3.0
+)
 
 require (
 	github.com/dave/jennifer v1.7.1
