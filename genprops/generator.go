@@ -66,7 +66,7 @@ func (g *Generator) Generate(models ...any) error {
 		return err
 	}
 
-	if err := g.outputDir(pkgName); err != nil {
+	if err := g.checkOutputDir(pkgName); err != nil {
 		return err
 	}
 
@@ -109,7 +109,7 @@ func (g *Generator) packageName(models []any) (string, error) {
 	return pkgName, nil
 }
 
-func (g *Generator) outputDir(pkgName string) error {
+func (g *Generator) checkOutputDir(pkgName string) error {
 	if err := os.MkdirAll(g.cfg.outputDir, 0755); err != nil {
 		return fmt.Errorf("create output dir failed: %w", err)
 	}
@@ -151,7 +151,7 @@ func (g *Generator) render(models []any, pkgName string) ([]byte, error) {
 		seen[sch.Name] = struct{}{}
 
 		g.cfg.logger.Debug("parsed model %s: %d field(s)", sch.Name, len(sch.Fields))
-		g.renderSchema(f, sch)
+		g.gen(f, sch)
 	}
 
 	var buf bytes.Buffer
@@ -162,7 +162,7 @@ func (g *Generator) render(models []any, pkgName string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (g *Generator) renderSchema(f *jen.File, sch *schema.Schema) {
+func (g *Generator) gen(f *jen.File, sch *schema.Schema) {
 	f.Comment(fmt.Sprintf("%sProps defines the fields for %s", sch.Name, sch.Name))
 
 	f.Var().Id(sch.Name+"Props").Op("=").StructFunc(func(grp *jen.Group) {
