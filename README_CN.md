@@ -6,7 +6,7 @@
 
 **GORM Query** 是一个基于 GORM 的强类型查询构建器与通用仓储（Repository）库。
 
-它通过**代码生成**消除了 GORM 查询中脆弱的“魔法字符串”，提供丝滑的链式调用体验，并内置了企业级的泛型 Repository 与基于 Context 的事务管理方案。
+它通过**代码生成**消除了 GORM 查询中脆弱的“魔法字符串”，提供丝滑的链式调用体验。它还内置了泛型 Repository 与基于 Context 的事务管理方案，帮助你写出更整洁的 Service 和数据访问层代码。
 
 ## ✨ 核心特性
 
@@ -43,7 +43,7 @@ type User struct {
 
 ### 2. 配置并执行代码生成
 
-创建一个简单的生成脚本（例如放在 `cmd/gen/main.go`），将你需要生成查询属性的模型传入生成器：
+创建一个简单的生成脚本（例如放在 `cmd/gen/main.go`），将你需要生成查询列定义的模型传入生成器：
 
 ```go
 package main
@@ -57,8 +57,8 @@ import (
 
 func main() {
     // 实例化生成器并传入模型
-   err := colgen.New().Generate(&model.User{})
-    
+    err := colgen.New().Generate(&model.User{})
+
     if err != nil {
         log.Fatalf("generate failed: %v", err)
     }
@@ -72,6 +72,8 @@ go run cmd/gen/main.go
 ```
 *这会自动生成一个代码文件（例如 `model/columns/user_gen.go`），其中包含 `columns.User` 变量。*
 
+默认情况下，`colgen` 会把生成结果写入独立的 `columns` 包中。
+
 > **💡 进阶提示：** 你也可以在任意 Go 文件的头部添加 `//go:generate go run cmd/gen/main.go`，之后就能通过在项目根目录运行 `go generate ./...` 将其无缝接入你的标准工作流。
 
 ### 3. 享受丝滑的强类型查询
@@ -80,10 +82,14 @@ go run cmd/gen/main.go
 
 ```go
 import (
+    "gorm.io/gorm"
+
     "your_project_name/model/columns"
     "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
 )
+
+var db *gorm.DB
 
 // 1. 丝滑地构建查询条件
 qb := query.New().
@@ -103,87 +109,62 @@ err := qb.Apply(db).Find(&users).Error
 
 ### 1. 泛型 Repository 与上下文事务 (Context-Aware TX)
 
-结合提供的 `db.Client` 和 `repo.BaseRepository`，你可以构建极度整洁的架构：
+`db.Client` 是 Service 层和 Repository 层之间的连接点：
 
-**定义 Repository 和 Service：**
+- Repository 只依赖 `db.DBProvider`
+- Service 只依赖 `db.Transactor`
+- 当前事务通过 `context.Context` 向下传递，因此你不需要手动传递 `*gorm.DB`
+
+为了让示例更紧凑，下面的代码直接接收 `*db.Client`，因为它本身就同时实现了这两个接口。
+
+**在 Service 中直接使用泛型 Repository：**
 ```go
-// 定义 UserRepository
-type UserRepository struct {
-    repo.BaseRepository[model.User]
-}
-
-func NewUserRepository(dbClient db.Client) *UserRepository {
-    return &UserRepository{
-        repo.New[model.User](dbClient),
-    }
-}
-
-// 定义 ProfileRepository
-type ProfileRepository struct {
-    repo.BaseRepository[model.Profile]
-}
-
-func NewProfileRepository(dbClient db.Client) *ProfileRepository {
-    return &ProfileRepository{
-        repo.New[model.Profile](dbClient),
-    }
-}
-
-// 定义 UserService
 type UserService struct {
-    userRepo    *UserRepository
-    profileRepo *ProfileRepository
-    transactor  db.Transactor
+    users    repo.Repository[model.User]
+    profiles repo.Repository[model.Profile]
+    tx       db.Transactor
 }
 
-func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, transactor db.Transactor) *UserService {
+func NewUserService(dbClient *db.Client) *UserService {
     return &UserService{
-        userRepo:    userRepo,
-        profileRepo: profileRepo,
-        transactor:  transactor,
+        users:    repo.New[model.User](dbClient),
+        profiles: repo.New[model.Profile](dbClient),
+        tx:       dbClient,
     }
 }
 ```
 
-**初始化与注入：**
+**初始化：**
 ```go
-import (
-    "github.com/im-wmkong/gorm-query/db"
-    "github.com/im-wmkong/gorm-query/repo"
-)
-
-// 1. 初始化 DB Client
-// 它同时实现了 repo 需要的 db.DBProvider 和 service 需要的 db.Transactor 接口
+// dbClient 同时实现了 db.DBProvider 和 db.Transactor。
 dbClient := db.NewClient(gormDB)
-// 2. 实例化 UserRepository
-userRepo := NewUserRepository(dbClient)
-// 3. 实例化 ProfileRepository
-profileRepo := NewProfileRepository(dbClient)
-// 4. 注入到 Service
-userService := NewUserService(userRepo, profileRepo, dbClient)
+
+userService := NewUserService(dbClient)
 ```
 
-**在 Service 层优雅地使用事务：**
+**把业务逻辑包进一个事务：**
 ```go
-// 业务代码完全不需要知道底层 gorm.DB 的存在
+// Service 只需要在这里开启一次事务。
+// Repository 会自动从 txCtx 中拿到同一个事务连接。
 func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User, profile *model.Profile) error {
-    // 开启事务
-    return s.transactor.Transaction(ctx, func(txCtx context.Context) error {
-        // 自动使用 txCtx 中的事务连接
-        if err := s.userRepo.Create(txCtx, user); err != nil {
-            return err 
+    return s.tx.Transaction(ctx, func(txCtx context.Context) error {
+        if err := s.users.Create(txCtx, user); err != nil {
+            return err
         }
 
         profile.UserID = user.ID
-        // 如果这里失败，上面的 Create 会自动回滚
-        if err := s.profileRepo.Create(txCtx, profile); err != nil {
+        if err := s.profiles.Create(txCtx, profile); err != nil {
             return err
         }
-        // 所有操作都在同一个事务中，无需手动 Commit/Rollback
+
         return nil
     })
 }
 ```
+
+由于两个 Repository 调用拿到的是同一个 `txCtx`，它们会自动运行在同一个事务里。只要其中任意一步返回错误，GORM 就会帮你整体回滚。
+
+如果后续你需要自定义 Repository 方法，也可以再把 `repo.New[T](dbClient)` 包装成你自己的 Repository 类型，而不需要改变这套事务模型。
 
 ### 2. 告别臃肿：基于 Builder 的动态仓储查询
 
@@ -200,6 +181,8 @@ func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User
 ```
 
 **GORM Query** 的 `query.Builder` 彻底解决了这个问题。借助通用的查询构建能力，开发者可以在 Service 层自由定制查询条件，并直接传递给泛型仓储。这使得 Repository 层保持极简，不再需要定义任何多余的方法。
+
+当 Service 已经依赖泛型 Repository 时，`query.Builder` 就成了补齐“动态过滤能力”的那块拼图。
 
 ```go
 // ✅ 现代模式：极简的 Repository + 强大的 Builder
@@ -218,7 +201,7 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
     }
 
     // 3. 直接将 builder 传递给 BaseRepository 的 Find 方法，无需在 repo 新增任何方法！
-    users, err := s.userRepo.Find(ctx, qb)
+    users, err := s.users.Find(ctx, qb)
     if err != nil {
         return nil, err
     }
@@ -229,7 +212,9 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
 
 ### 3. 查询条件的复用 (防污染)
 
-如果需要基于一个基础查询派生出不同的查询，请使用 `.Clone()` 方法防止切片底层数组的条件污染：
+当你需要从同一个基础 builder 派生多个查询时，请使用 `.Clone()`。
+
+它可以防止底层切片共享带来的条件污染：
 
 ```go
 baseQuery := query.New().Where(columns.User.Status.Eq(1))

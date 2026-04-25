@@ -8,7 +8,7 @@
 
 **GORM Query** is a strongly-typed query builder and generic repository library built on top of GORM.
 
-It eliminates fragile "magic strings" in GORM queries through **code generation**, providing a smooth fluent API experience. It also features enterprise-grade generic repositories and context-based transaction management.
+It eliminates fragile "magic strings" in GORM queries through **code generation**, providing a smooth fluent API experience. It also includes generic repositories and context-aware transaction management for cleaner service and data layers.
 
 ## ✨ Core Features
 
@@ -45,7 +45,7 @@ type User struct {
 
 ### 2. Configure and Run Code Generation
 
-Create a simple generation script (e.g., at `cmd/gen/main.go`) and pass the models you want to generate properties for:
+Create a simple generation script (e.g., at `cmd/gen/main.go`) and pass the models you want to generate query columns for:
 
 ```go
 package main
@@ -60,7 +60,7 @@ import (
 func main() {
     // Initialize the generator and provide your models
     err := colgen.New().Generate(&model.User{})
-    
+
     if err != nil {
         log.Fatalf("generate failed: %v", err)
     }
@@ -74,6 +74,8 @@ go run cmd/gen/main.go
 ```
 *This will automatically create a code file (e.g., `model/columns/user_gen.go`) containing the generated `columns.User` variable.*
 
+By default, `colgen` writes generated columns into a dedicated `columns` package.
+
 > **💡 Pro Tip:** You can add `//go:generate go run cmd/gen/main.go` to the top of any Go file and trigger generation using `go generate ./...` in your standard workflow.
 
 ### 3. Enjoy Smooth Strongly-typed Queries
@@ -82,10 +84,14 @@ Now you can use the generated `columns.User` with the Query Builder for type-saf
 
 ```go
 import (
+    "gorm.io/gorm"
+
     "your_project_name/model/columns"
     "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
 )
+
+var db *gorm.DB
 
 // 1. Build queries fluently
 qb := query.New().
@@ -105,89 +111,68 @@ err := qb.Apply(db).Find(&users).Error
 
 ### 1. Generic Repository & Context-Aware Transactions
 
-Combine `db.Client` and `repo.BaseRepository` to build a clean architecture:
+`db.Client` is the glue between your Service and Repository layers:
 
-**Define Repositories and Service:**
+- Repositories depend only on `db.DBProvider`
+- Services depend only on `db.Transactor`
+- The active transaction flows through `context.Context`, so you never need to pass `*gorm.DB` around manually
+
+For brevity, the example below accepts `*db.Client` directly, since it already implements both interfaces.
+
+**Define a Service with Generic Repositories:**
 ```go
-// Define UserRepository
-type UserRepository struct {
-    repo.BaseRepository[model.User]
-}
-
-func NewUserRepository(dbClient db.Client) *UserRepository {
-    return &UserRepository{
-        repo.New[model.User](dbClient),
-    }
-}
-
-// Define ProfileRepository
-type ProfileRepository struct {
-    repo.BaseRepository[model.Profile]
-}
-
-func NewProfileRepository(dbClient db.Client) *ProfileRepository {
-    return &ProfileRepository{
-        repo.New[model.Profile](dbClient),
-    }
-}
-
-// Define UserService
 type UserService struct {
-    userRepo    *UserRepository
-    profileRepo *ProfileRepository
-    transactor  db.Transactor
+    users    repo.Repository[model.User]
+    profiles repo.Repository[model.Profile]
+    tx       db.Transactor
 }
 
-func NewUserService(userRepo *UserRepository, profileRepo *ProfileRepository, transactor db.Transactor) *UserService {
+func NewUserService(dbClient *db.Client) *UserService {
     return &UserService{
-        userRepo:    userRepo,
-        profileRepo: profileRepo,
-        transactor:  transactor,
+        users:    repo.New[model.User](dbClient),
+        profiles: repo.New[model.Profile](dbClient),
+        tx:       dbClient,
     }
 }
 ```
 
-**Initialization and Injection:**
+**Initialize It:**
 ```go
-import (
-    "github.com/im-wmkong/gorm-query/db"
-    "github.com/im-wmkong/gorm-query/repo"
-)
-
-// 1. Initialize DB Client
+// dbClient implements both db.DBProvider and db.Transactor.
 dbClient := db.NewClient(gormDB)
-// 2. Instantiate Repositories
-userRepo := NewUserRepository(dbClient)
-profileRepo := NewProfileRepository(dbClient)
-// 3. Inject into Service
-userService := NewUserService(userRepo, profileRepo, dbClient)
+
+userService := NewUserService(dbClient)
 ```
 
-**Elegant Transaction Management in Service Layer:**
+**Wrap Business Logic in One Transaction:**
 ```go
-// Business logic doesn't need to know about gorm.DB
+// The service coordinates the transaction once.
+// Repositories automatically pick it up from txCtx.
 func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User, profile *model.Profile) error {
-    // Transaction starts here
-    return s.transactor.Transaction(ctx, func(txCtx context.Context) error {
-        // Automatically uses the transaction stored in txCtx
-        if err := s.userRepo.Create(txCtx, user); err != nil {
-            return err 
+    return s.tx.Transaction(ctx, func(txCtx context.Context) error {
+        if err := s.users.Create(txCtx, user); err != nil {
+            return err
         }
 
         profile.UserID = user.ID
-        // If this fails, the previous Create will automatically roll back
-        if err := s.profileRepo.Create(txCtx, profile); err != nil {
+        if err := s.profiles.Create(txCtx, profile); err != nil {
             return err
         }
-        
+
         return nil
     })
 }
 ```
 
+Both repository calls receive the same `txCtx`, so they run inside the same transaction automatically. If any step returns an error, GORM rolls everything back for you.
+
+When you need custom repository methods later, you can still wrap `repo.New[T](dbClient)` inside your own repository types without changing this transaction model.
+
 ### 2. Dynamic Repository Queries
 
 Stop inflating your Repository interfaces with dozens of specific methods like `FindByNameAndAge`. Use the `query.Builder` to handle dynamic conditions in the Service layer while keeping your Repository clean.
+
+Once your service already depends on a generic repository, `query.Builder` becomes the missing piece for dynamic filtering.
 
 ```go
 func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]*model.User, error) {
@@ -202,13 +187,15 @@ func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]
     }
 
     // 2. Pass the builder directly to the generic Find method
-    return s.userRepo.Find(ctx, qb)
+    return s.users.Find(ctx, qb)
 }
 ```
 
 ### 3. Query Reuse (Cloning)
 
-Use `.Clone()` to derive new queries from a base query without polluting the original:
+Use `.Clone()` when multiple derived queries start from the same base builder.
+
+It helps you derive new queries from a base query without polluting the original:
 
 ```go
 baseQuery := query.New().Where(columns.User.Status.Eq(1))
