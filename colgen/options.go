@@ -1,4 +1,4 @@
-package genprops
+package colgen
 
 import "gorm.io/gorm/schema"
 
@@ -6,7 +6,6 @@ type Option func(*config)
 
 type config struct {
 	outputDir      string
-	outputFile     string
 	packageName    string
 	namingStrategy schema.NamingStrategy
 	dryRun         bool
@@ -15,8 +14,7 @@ type config struct {
 
 func defaultConfig() config {
 	return config{
-		outputDir:  "./",
-		outputFile: "props_gen.go",
+		outputDir: "columns",
 		namingStrategy: schema.NamingStrategy{
 			SingularTable: true,
 		},
@@ -28,7 +26,7 @@ func defaultConfig() config {
 //
 // Example:
 //
-//	g := genprops.New(genprops.WithOutputDir("./model"))
+//	g := colgen.New(colgen.WithOutputDir("./model"))
 //	_ = g
 func WithOutputDir(dir string) Option {
 	return func(c *config) {
@@ -36,23 +34,11 @@ func WithOutputDir(dir string) Option {
 	}
 }
 
-// WithOutputFile sets the output file name.
-//
-// Example:
-//
-//	g := genprops.New(genprops.WithOutputFile("props_gen.go"))
-//	_ = g
-func WithOutputFile(name string) Option {
-	return func(c *config) {
-		c.outputFile = name
-	}
-}
-
 // WithPackageName sets the output package name.
 //
 // Example:
 //
-//	g := genprops.New(genprops.WithPackageName("model"))
+//	g := colgen.New(colgen.WithPackageName("model"))
 //	_ = g
 func WithPackageName(name string) Option {
 	return func(c *config) {
@@ -65,7 +51,7 @@ func WithPackageName(name string) Option {
 // Example:
 //
 //	ns := schema.NamingStrategy{SingularTable: true}
-//	g := genprops.New(genprops.WithNamingStrategy(ns))
+//	g := colgen.New(colgen.WithNamingStrategy(ns))
 //	_ = g
 func WithNamingStrategy(ns schema.NamingStrategy) Option {
 	return func(c *config) {
@@ -77,7 +63,7 @@ func WithNamingStrategy(ns schema.NamingStrategy) Option {
 //
 // Example:
 //
-//	err := genprops.New(genprops.WithDryRun(true)).Generate(&model.User{})
+//	err := colgen.New(colgen.WithDryRun(true)).Generate(&model.User{})
 //	_ = err
 func WithDryRun(d bool) Option {
 	return func(c *config) {
@@ -89,7 +75,7 @@ func WithDryRun(d bool) Option {
 //
 // Example:
 //
-//	g := genprops.New(genprops.WithLogger(genprops.NewDefaultLogger()))
+//	g := colgen.New(colgen.WithLogger(colgen.NewDefaultLogger()))
 //	_ = g
 func WithLogger(l Logger) Option {
 	return func(c *config) {

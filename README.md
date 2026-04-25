@@ -12,7 +12,7 @@ It eliminates fragile "magic strings" in GORM queries through **code generation*
 
 ## ✨ Core Features
 
-- 🛡️ **Strongly-typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `UserProps.Age.Gt(18)`. Catch field name typos at compile time.
+- 🛡️ **Strongly-typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `columns.User.Age.Gt(18)`. Catch field name typos at compile time.
 - 📦 **Out-of-the-box Generic Repository**: Use `repo.BaseRepository[T]` to gain full CRUD capabilities with a single line of code.
 - 🎯 **Stop Bloating Repositories**: Combine the universal query builder to compose dynamic queries on the fly—no more writing dozens of `FindByXxx` methods.
 - 🔄 **Implicit Context Transactions**: Pass transactions via `context.Context`. Decouple your Service layer from the Repo layer without passing `*gorm.DB` everywhere.
@@ -54,12 +54,12 @@ import (
     "log"
 
     "your_project_name/model" // Replace with your actual project path
-    "github.com/im-wmkong/gorm-query/genprops"
+    "github.com/im-wmkong/gorm-query/colgen"
 )
 
 func main() {
     // Initialize the generator and provide your models
-    err := genprops.New().Generate(&model.User{})
+    err := colgen.New().Generate(&model.User{})
     
     if err != nil {
         log.Fatalf("generate failed: %v", err)
@@ -72,16 +72,17 @@ Run the script from your terminal:
 ```bash
 go run cmd/gen/main.go
 ```
-*This will automatically create a code file (e.g., `props_gen.go`) in your model directory containing the `UserProps` variable.*
+*This will automatically create a code file (e.g., `model/columns/user_gen.go`) containing the generated `columns.User` variable.*
 
 > **💡 Pro Tip:** You can add `//go:generate go run cmd/gen/main.go` to the top of any Go file and trigger generation using `go generate ./...` in your standard workflow.
 
 ### 3. Enjoy Smooth Strongly-typed Queries
 
-Now you can use the generated `UserProps` with the Query Builder for type-safe queries:
+Now you can use the generated `columns.User` with the Query Builder for type-safe queries:
 
 ```go
 import (
+    "your_project_name/model/columns"
     "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
 )
@@ -89,11 +90,11 @@ import (
 // 1. Build queries fluently
 qb := query.New().
     Where(
-        model.UserProps.Age.Gte(18),
-        model.UserProps.UserName.Contains("wmkong"),
+        columns.User.Age.Gte(18),
+        columns.User.UserName.Contains("wmkong"),
     ).
     Page(1, 20).
-    Order(model.UserProps.ID.Desc())
+    Order(columns.User.ID.Desc())
 
 // 2. Apply to gorm.DB
 var users []model.User
@@ -191,13 +192,13 @@ Stop inflating your Repository interfaces with dozens of specific methods like `
 ```go
 func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]*model.User, error) {
     // 1. Build dynamic conditions
-    qb := query.New().Where(model.UserProps.Status.Eq(1))
+    qb := query.New().Where(columns.User.Status.Eq(1))
 
     if name != "" {
-        qb = qb.Where(model.UserProps.UserName.Contains(name))
+        qb = qb.Where(columns.User.UserName.Contains(name))
     }
     if minAge > 0 {
-        qb = qb.Where(model.UserProps.Age.Gte(minAge))
+        qb = qb.Where(columns.User.Age.Gte(minAge))
     }
 
     // 2. Pass the builder directly to the generic Find method
@@ -210,13 +211,13 @@ func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]
 Use `.Clone()` to derive new queries from a base query without polluting the original:
 
 ```go
-baseQuery := query.New().Where(UserProps.Status.Eq(1))
+baseQuery := query.New().Where(columns.User.Status.Eq(1))
 
 // Derived Query A
-adults := baseQuery.Clone().Where(UserProps.Age.Gte(18))
+adults := baseQuery.Clone().Where(columns.User.Age.Gte(18))
 
 // Derived Query B (Will NOT include Age >= 18 condition)
-minors := baseQuery.Clone().Where(UserProps.Age.Lt(18))
+minors := baseQuery.Clone().Where(columns.User.Age.Lt(18))
 ```
 
 ## 🤝 Contributing

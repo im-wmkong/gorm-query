@@ -10,7 +10,7 @@
 
 ## ✨ 核心特性
 
-- 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `UserProps.Age.Gt(18)`，在编译期拦截字段名拼写错误。
+- 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `columns.User.Age.Gt(18)`，在编译期拦截字段名拼写错误。
 - 📦 **开箱即用的泛型仓储**：提供 `repo.BaseRepository[T]`，一行代码拥有完整的 CRUD 能力。
 - 🎯 **告别臃肿的 Repository**：结合通用 builder 查询构建器，按需动态组合查询条件，无需再为不同业务编写数十个 `FindByXxx` 方法。
 - 🔄 **隐式上下文事务**：基于 `context.Context` 传递事务，Service 层与 Repo 层彻底解耦，再也不用把 `*gorm.DB` 传来传去。
@@ -52,12 +52,12 @@ import (
     "log"
 
     "your_project_name/model" // 替换为你的实际项目路径
-    "github.com/im-wmkong/gorm-query/genprops"
+    "github.com/im-wmkong/gorm-query/colgen"
 )
 
 func main() {
     // 实例化生成器并传入模型
-   err := genprops.New().Generate(&model.User{})
+   err := colgen.New().Generate(&model.User{})
     
     if err != nil {
         log.Fatalf("generate failed: %v", err)
@@ -70,16 +70,17 @@ func main() {
 ```bash
 go run cmd/gen/main.go
 ```
-*这将在模型所在目录下自动生成包含 `UserProps` 的代码文件。*
+*这会自动生成一个代码文件（例如 `model/columns/user_gen.go`），其中包含 `columns.User` 变量。*
 
 > **💡 进阶提示：** 你也可以在任意 Go 文件的头部添加 `//go:generate go run cmd/gen/main.go`，之后就能通过在项目根目录运行 `go generate ./...` 将其无缝接入你的标准工作流。
 
 ### 3. 享受丝滑的强类型查询
 
-现在，你可以使用生成的 `UserProps` 配合 Query Builder 进行类型安全的查询了：
+现在，你可以使用生成的 `columns.User` 配合 Query Builder 进行类型安全的查询了：
 
 ```go
 import (
+    "your_project_name/model/columns"
     "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
 )
@@ -87,11 +88,11 @@ import (
 // 1. 丝滑地构建查询条件
 qb := query.New().
     Where(
-        model.UserProps.Age.Gte(18),
-        model.UserProps.UserName.Contains("wmkong"),
+        columns.User.Age.Gte(18),
+        columns.User.UserName.Contains("wmkong"),
     ).
     Page(1, 20).
-    Order(model.UserProps.ID.Desc())
+    Order(columns.User.ID.Desc())
 
 // 2. 应用到 gorm.DB
 var users []model.User
@@ -205,15 +206,15 @@ func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User
 func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name string, minAge int) ([]*model.User, error) {
     // 1. 使用 builder 自由组合查询条件
     qb := query.New().Where(
-        model.UserProps.Status.Eq(1), // 默认条件
+        columns.User.Status.Eq(1), // 默认条件
     )
 
     // 2. 动态追加条件
     if name != "" {
-        qb = qb.Where(model.UserProps.UserName.Contains(name))
+        qb = qb.Where(columns.User.UserName.Contains(name))
     }
     if minAge > 0 {
-        qb = qb.Where(model.UserProps.Age.Gte(minAge))
+        qb = qb.Where(columns.User.Age.Gte(minAge))
     }
 
     // 3. 直接将 builder 传递给 BaseRepository 的 Find 方法，无需在 repo 新增任何方法！
@@ -231,13 +232,13 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
 如果需要基于一个基础查询派生出不同的查询，请使用 `.Clone()` 方法防止切片底层数组的条件污染：
 
 ```go
-baseQuery := query.New().Where(UserProps.Status.Eq(1))
+baseQuery := query.New().Where(columns.User.Status.Eq(1))
 
 // 派生查询 A
-adultsQuery := baseQuery.Clone().Where(UserProps.Age.Gte(18))
+adultsQuery := baseQuery.Clone().Where(columns.User.Age.Gte(18))
 
 // 派生查询 B (不会包含 Age >= 18 的条件)
-minorsQuery := baseQuery.Clone().Where(UserProps.Age.Lt(18))
+minorsQuery := baseQuery.Clone().Where(columns.User.Age.Lt(18))
 ```
 
 ## 🤝 参与贡献

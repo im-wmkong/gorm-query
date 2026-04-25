@@ -6,6 +6,7 @@ import (
 
 	"github.com/im-wmkong/gorm-query/db"
 	"github.com/im-wmkong/gorm-query/example/model"
+	"github.com/im-wmkong/gorm-query/example/model/columns"
 	"github.com/im-wmkong/gorm-query/example/repository"
 	"github.com/im-wmkong/gorm-query/query"
 )
@@ -36,7 +37,7 @@ func NewUserService(repo repository.UserRepository, tm db.Transactor) UserServic
 func (s *userService) CreateUser(ctx context.Context, user *model.User) error {
 	return s.transactor.Transaction(ctx, func(ctx context.Context) error {
 		// Check if the email already exists.
-		q := query.New().Where(model.UserProps.Email.Eq(user.Email))
+		q := query.New().Where(columns.User.Email.Eq(user.Email))
 		count, err := s.repo.Count(ctx, q)
 		if err != nil {
 			return err
@@ -62,16 +63,16 @@ func (s *userService) GetActiveUsers(ctx context.Context, minAge int, keyword st
 	// 5) ORDER BY CreatedAt DESC
 
 	q := query.New().Where(
-		model.UserProps.Status.Eq(1),
-		model.UserProps.Age.Gte(minAge),
-		model.UserProps.UserName.NotIn([]string{"admin", "root"}), // NotIn demo
+		columns.User.Status.Eq(1),
+		columns.User.Age.Gte(minAge),
+		columns.User.UserName.NotIn([]string{"admin", "root"}), // NotIn demo
 	)
 
 	if keyword != "" {
-		q = q.Where(model.UserProps.Email.Like("%" + keyword + "%")) // Like demo
+		q = q.Where(columns.User.Email.Like("%" + keyword + "%")) // Like demo
 	}
 
-	q = q.Order(model.UserProps.CreatedAt.Desc())
+	q = q.Order(columns.User.CreatedAt.Desc())
 
 	return s.repo.Find(ctx, q)
 }

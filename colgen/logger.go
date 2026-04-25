@@ -1,11 +1,11 @@
-package genprops
+package colgen
 
 import (
 	"log"
 	"os"
 )
 
-// Logger defines the logging interface used by the genprops generator.
+// Logger defines the logging interface used by the colgen generator.
 type Logger interface {
 	// Debug logs debug-level messages.
 	Debug(format string, a ...any)
@@ -24,10 +24,10 @@ type defaultLogger struct {
 //
 // Example:
 //
-//	g := genprops.New(genprops.WithLogger(genprops.NewDefaultLogger()))
+//	g := colgen.New(colgen.WithLogger(colgen.NewDefaultLogger()))
 //	_ = g
 func NewDefaultLogger() Logger {
-	return &defaultLogger{l: log.New(os.Stderr, "[genprops] ", log.LstdFlags)}
+	return &defaultLogger{l: log.New(os.Stderr, "[colgen] ", log.LstdFlags)}
 }
 
 func (d *defaultLogger) Debug(format string, a ...any) { d.l.Printf("[DEBUG] "+format, a...) }
@@ -41,7 +41,7 @@ type nopLogger struct{}
 //
 // Example:
 //
-//	g := genprops.New(genprops.WithLogger(genprops.NopLogger()))
+//	g := colgen.New(colgen.WithLogger(colgen.NopLogger()))
 //	_ = g
 func NopLogger() Logger                         { return nopLogger{} }
 func (nopLogger) Debug(format string, a ...any) { _ = format; _ = a }
