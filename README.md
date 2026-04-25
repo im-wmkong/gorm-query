@@ -23,6 +23,19 @@ It eliminates fragile "magic strings" in GORM queries through **code generation*
 go get github.com/im-wmkong/gorm-query
 ```
 
+## 🗺️ Capability Map
+
+GORM Query consists of 4 core modules:
+
+| Module | Core Responsibility | Key Capabilities / Methods |
+| :--- | :--- | :--- |
+| **`colgen`** | **Code Generation** | Generates column definitions like `columns.User` from GORM models. Supports custom output, package names, and dry-run validation. |
+| **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Joins`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... |
+| **`repo`** | **Generic Repository** | Provides common CRUD methods: `Create`, `Save`, `Find`, `First`, `Update`, `Delete`, `Pluck`... |
+| **`db`** | **Context Transaction** | `db.Client` implements both `DBProvider` and `Transactor`. Repositories automatically reuse the same transaction via `ctx`. |
+
+**Best Path to Start:** `colgen` generation ➔ `columns.Xxx` definitions ➔ `query` builder ➔ `repo` execution.
+
 ## 🚀 Quick Start
 
 ### 1. Define Your Model
