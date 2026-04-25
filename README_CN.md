@@ -21,6 +21,19 @@
 go get github.com/im-wmkong/gorm-query
 ```
 
+## 🗺️ 能力总览
+
+GORM Query 的核心能力由以下 4 个模块构成，它们各司其职，又完美配合：
+
+| 模块 | 核心职责 | 典型能力 / 方法 |
+| :--- | :--- | :--- |
+| **`colgen`** | **代码生成** | 解析 GORM 模型生成强类型列定义。支持自定义输出目录、包名及 Dry-run 校验。 |
+| **`query`** | **动态查询构建** | **Builder**: `Where`, `Select`, `Joins`, `Preload`, `Page`, `Clone`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... |
+| **`repo`** | **泛型仓储** | 提供通用 CRUD：`Create`, `Find`, `First`, `Update`, `Delete`, `Count`, `Pluck`... |
+| **`db`** | **上下文事务管理** | 提供 `db.Client`，支持通过 `context.Context` 无感传递事务连接，避免手动透传 DB。 |
+
+**最佳上手路径：** `colgen` 生成列定义 ➔ 使用 `columns.Xxx` 构建 `query` ➔ 传入 `repo` 执行。
+
 ## 🚀 快速开始
 
 ### 1. 定义你的模型
