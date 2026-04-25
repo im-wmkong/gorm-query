@@ -33,7 +33,7 @@ type Generator struct {
 // Example:
 //
 //	g := colgen.New(
-//	    colgen.WithOutputDir("./model"),
+//	    colgen.WithOutputDir("columns"),
 //	)
 //	_ = g
 func New(opts ...Option) *Generator {
