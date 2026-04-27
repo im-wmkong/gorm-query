@@ -111,7 +111,7 @@ func (g *Generator) checkSamePackage(models []any) error {
 	for _, model := range models[1:] {
 		currentPkg := reflectx.PackageName(model)
 		if currentPkg != pkgName {
-			return fmt.Errorf("all models must be in the same package or explicitly set WithPackageName")
+			return fmt.Errorf("all models must be in the same package")
 		}
 	}
 	return nil
