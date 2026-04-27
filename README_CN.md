@@ -147,14 +147,6 @@ func NewUserService(dbClient *db.Client) *UserService {
 }
 ```
 
-**初始化：**
-```go
-// dbClient 同时实现了 db.DBProvider 和 db.Transactor。
-dbClient := db.NewClient(gormDB)
-
-userService := NewUserService(dbClient)
-```
-
 **把业务逻辑包进一个事务：**
 ```go
 // Service 只需要在这里开启一次事务。
