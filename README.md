@@ -149,14 +149,6 @@ func NewUserService(dbClient *db.Client) *UserService {
 }
 ```
 
-**Initialize It:**
-```go
-// dbClient implements both db.DBProvider and db.Transactor.
-dbClient := db.NewClient(gormDB)
-
-userService := NewUserService(dbClient)
-```
-
 **Wrap Business Logic in One Transaction:**
 ```go
 // The service coordinates the transaction once.
