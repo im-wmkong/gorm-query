@@ -50,11 +50,47 @@ func TestFilterNilModels(t *testing.T) {
 }
 
 func TestGeneratorResolvePackageName(t *testing.T) {
+	t.Run("explicit package name wins", func(t *testing.T) {
+		g := New(WithPackageName("model"))
+		pkgName, err := g.packageName()
+		require.NoError(t, err)
+		assert.Equal(t, "model", pkgName)
+	})
+
+	t.Run("inferred from default output dir", func(t *testing.T) {
+		g := New()
+		pkgName, err := g.packageName()
+		require.NoError(t, err)
+		assert.Equal(t, "columns", pkgName)
+	})
+
+	t.Run("inferred from custom output dir", func(t *testing.T) {
+		g := New(WithOutputDir("./path/to/mypkg"))
+		pkgName, err := g.packageName()
+		require.NoError(t, err)
+		assert.Equal(t, "mypkg", pkgName)
+	})
+
+	t.Run("fails when output dir is not a valid identifier", func(t *testing.T) {
+		g := New(WithOutputDir("./invalid-dir"))
+		_, err := g.packageName()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to resolve package name")
+	})
+}
+
+func TestGeneratorCheckSameModelPackage(t *testing.T) {
 	g := New()
 
-	pkgName, err := g.packageName([]any{&user{}, &localGenPropsModel{}})
-	require.NoError(t, err)
-	assert.Equal(t, "columns", pkgName)
+	t.Run("same package passes", func(t *testing.T) {
+		require.NoError(t, g.checkSamePackage([]any{&user{}, &localGenPropsModel{}}))
+	})
+
+	t.Run("different packages fail", func(t *testing.T) {
+		err := g.checkSamePackage([]any{&user{}, &struct{ ID uint }{}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "all models must be in the same package")
+	})
 }
 
 func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
@@ -184,19 +220,19 @@ func TestGenPropsGenerate_SkipsIgnoredFields(t *testing.T) {
 func TestGenPropsGenerate_DryRun(t *testing.T) {
 	outDir := t.TempDir()
 
-	g := New(WithOutputDir(outDir))
+	g := New(WithOutputDir(outDir), WithPackageName("model"))
 	require.NoError(t, g.Generate(&user{}))
 
 	dryRunGenerator := New(
 		WithOutputDir(outDir),
+		WithPackageName("model"),
 		WithDryRun(true),
 	)
 	require.NoError(t, dryRunGenerator.Generate(&user{}))
 
 	propsFile := filepath.Join(outDir, "user_gen.go")
-	// Keep the package in outputDir consistent with the auto-detected package name;
-	// otherwise dry-run will fail earlier due to package mismatch.
-	require.NoError(t, os.WriteFile(propsFile, []byte("package colgen\n"), 0644))
+	// Overwrite the generated file with different content so dry-run detects it's outdated.
+	require.NoError(t, os.WriteFile(propsFile, []byte("package model\n"), 0644))
 
 	err := dryRunGenerator.Generate(&user{})
 	require.Error(t, err)
@@ -283,6 +319,30 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 		).Generate(&user{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "render failed")
+	})
+
+	t.Run("package name resolution failed", func(t *testing.T) {
+		// outputDir ends with an invalid Go identifier and no explicit package name,
+		// so packageName() returns an error.
+		outDir := filepath.Join(t.TempDir(), "invalid-dir")
+		require.NoError(t, os.MkdirAll(outDir, 0755))
+
+		err := New(WithOutputDir(outDir)).Generate(&user{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to resolve package name")
+	})
+
+	t.Run("write file failed", func(t *testing.T) {
+		outDir := t.TempDir()
+		// Create a directory at the target file path so os.WriteFile fails.
+		require.NoError(t, os.Mkdir(filepath.Join(outDir, "user_gen.go"), 0755))
+
+		err := New(
+			WithOutputDir(outDir),
+			WithPackageName("model"),
+		).Generate(&user{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "write file failed")
 	})
 }
 
