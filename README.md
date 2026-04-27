@@ -126,6 +126,7 @@ err := qb.Apply(db).Find(&users).Error
 
 `db.Client` is the glue between your Service and Repository layers:
 
+- `db.Client` implements both `db.DBProvider` and `db.Transactor`
 - Repositories depend only on `db.DBProvider`
 - Services depend only on `db.Transactor`
 - The active transaction flows through `context.Context`, so you never need to pass `*gorm.DB` around manually
