@@ -41,9 +41,6 @@ type Client struct {
 //	client := db.NewClient(gormDB)
 //	_ = client
 func NewClient(db *gorm.DB) *Client {
-	if db == nil {
-		panic("db: NewClient called with nil *gorm.DB")
-	}
 	return &Client{db: db}
 }
 

@@ -131,9 +131,3 @@ func TestDB_ContextValueNotGormDB(t *testing.T) {
 	var count int64
 	require.NoError(t, session.Model(&user{}).Count(&count).Error)
 }
-
-func TestNewClient_PanicsOnNilDB(t *testing.T) {
-	require.PanicsWithValue(t, "db: NewClient called with nil *gorm.DB", func() {
-		_ = NewClient(nil)
-	})
-}

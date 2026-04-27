@@ -1,18 +1,31 @@
+// Package fsx provides filesystem helpers for Go source packages.
 package fsx
 
 import (
-	"bufio"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-func PackageNameFromDir(dir string) (string, error) {
+// ReadPackageNameFromDir reads non-test .go files under dir and returns the
+// declared package name. It returns an empty string (with nil error) when no
+// valid Go source file is found.
+//
+// It returns an error when:
+//   - the directory cannot be read;
+//   - two different package names are declared in the same directory.
+//
+// Unparseable .go files are skipped silently to tolerate work-in-progress files.
+func ReadPackageNameFromDir(dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", err
 	}
+
+	fset := token.NewFileSet()
 
 	var pkg string
 	for _, entry := range entries {
@@ -25,73 +38,19 @@ func PackageNameFromDir(dir string) (string, error) {
 			continue
 		}
 
-		file, err := os.Open(filepath.Join(dir, name))
+		path := filepath.Join(dir, name)
+		file, err := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly)
 		if err != nil {
+			// Ignore unparseable files (e.g. work-in-progress source).
 			continue
 		}
 
-		detected, _ := packageNameFromFile(file)
-		_ = file.Close()
-		if detected == "" {
-			continue
-		}
+		detected := file.Name.Name
 		if pkg != "" && pkg != detected {
-			return "", fmt.Errorf("multiple packages found in %s", dir)
+			return "", fmt.Errorf("multiple packages found in %s: %q and %q", dir, pkg, detected)
 		}
 		pkg = detected
 	}
 
 	return pkg, nil
-}
-
-func packageNameFromFile(file *os.File) (string, error) {
-	scanner := bufio.NewScanner(file)
-	inBlockComment := false
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		for {
-			switch {
-			case inBlockComment:
-				end := strings.Index(line, "*/")
-				if end == -1 {
-					line = ""
-					break
-				}
-				line = strings.TrimSpace(line[end+2:])
-				inBlockComment = false
-				if line == "" {
-					break
-				}
-				continue
-			case strings.HasPrefix(line, "/*"):
-				end := strings.Index(line, "*/")
-				if end == -1 {
-					inBlockComment = true
-					line = ""
-					break
-				}
-				line = strings.TrimSpace(line[end+2:])
-				if line == "" {
-					break
-				}
-				continue
-			}
-			break
-		}
-
-		if line == "" || strings.HasPrefix(line, "//") {
-			continue
-		}
-		if strings.HasPrefix(line, "package ") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				return parts[1], nil
-			}
-		}
-		break
-	}
-
-	return "", scanner.Err()
 }

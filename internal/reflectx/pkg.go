@@ -1,3 +1,4 @@
+// Package reflectx provides reflection helpers used internally by gorm-query.
 package reflectx
 
 import (
@@ -5,11 +6,25 @@ import (
 	"strings"
 )
 
-func PackageName(model interface{}) string {
+// PackageName returns the last segment of the package path of model's type.
+//
+// It returns ok=false when:
+//   - model is nil;
+//   - the type has no package path (e.g. anonymous structs, built-in types).
+func PackageName(model any) (name string, ok bool) {
+	if model == nil {
+		return "", false
+	}
 	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	parts := strings.Split(t.PkgPath(), "/")
-	return parts[len(parts)-1]
+	pkgPath := t.PkgPath()
+	if pkgPath == "" {
+		return "", false
+	}
+	if idx := strings.LastIndex(pkgPath, "/"); idx >= 0 {
+		return pkgPath[idx+1:], true
+	}
+	return pkgPath, true
 }

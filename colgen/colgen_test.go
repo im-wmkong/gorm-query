@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/im-wmkong/gorm-query/example/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -82,12 +83,33 @@ func TestGeneratorResolvePackageName(t *testing.T) {
 func TestGeneratorCheckSameModelPackage(t *testing.T) {
 	g := New()
 
+	t.Run("single model passes", func(t *testing.T) {
+		require.NoError(t, g.checkSamePackage([]any{&user{}}))
+	})
+
+	t.Run("empty slice passes", func(t *testing.T) {
+		require.NoError(t, g.checkSamePackage(nil))
+	})
+
 	t.Run("same package passes", func(t *testing.T) {
 		require.NoError(t, g.checkSamePackage([]any{&user{}, &localGenPropsModel{}}))
 	})
 
-	t.Run("different packages fail", func(t *testing.T) {
+	t.Run("anonymous struct fails with no package path", func(t *testing.T) {
 		err := g.checkSamePackage([]any{&user{}, &struct{ ID uint }{}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no package path")
+	})
+
+	t.Run("first model has no package path", func(t *testing.T) {
+		err := g.checkSamePackage([]any{&struct{ ID uint }{}, &user{}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no package path")
+	})
+
+	t.Run("different real packages fail", func(t *testing.T) {
+		// colgen.user and example/model.User live in different real packages.
+		err := g.checkSamePackage([]any{&user{}, &model.User{}})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "all models must be in the same package")
 	})
@@ -240,6 +262,21 @@ func TestGenPropsGenerate_DryRun(t *testing.T) {
 	assert.Contains(t, err.Error(), propsFile)
 }
 
+func TestGenPropsGenerate_DryRunMissingFile(t *testing.T) {
+	outDir := t.TempDir()
+
+	dryRunGenerator := New(
+		WithOutputDir(outDir),
+		WithPackageName("model"),
+		WithDryRun(true),
+	)
+
+	err := dryRunGenerator.Generate(&user{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "generated file missing")
+	assert.Contains(t, err.Error(), filepath.Join(outDir, "user_gen.go"))
+}
+
 func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 	t.Run("no models", func(t *testing.T) {
 		err := New().Generate(nil)
@@ -258,12 +295,11 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 	})
 
 	t.Run("mixed packages without explicit package name", func(t *testing.T) {
-		// Use an anonymous struct as the second arg (reflect.Type.PkgPath() == "") to simulate
-		// a different package and trigger the "all models must be in the same package" validation
-		// without depending on example/model.
+		// Use an anonymous struct as the second arg (reflect.Type.PkgPath() == "") to trigger
+		// the "no package path" validation without depending on example/model.
 		err := New(WithOutputDir(t.TempDir())).Generate(&user{}, &struct{ ID uint }{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "all models must be in the same package")
+		assert.Contains(t, err.Error(), "no package path")
 	})
 
 	t.Run("package mismatch in output dir", func(t *testing.T) {
@@ -332,9 +368,9 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 		assert.Contains(t, err.Error(), "unable to resolve package name")
 	})
 
-	t.Run("write file failed", func(t *testing.T) {
+	t.Run("target path is a directory", func(t *testing.T) {
 		outDir := t.TempDir()
-		// Create a directory at the target file path so os.WriteFile fails.
+		// Create a directory at the target file path so both os.ReadFile and os.WriteFile fail.
 		require.NoError(t, os.Mkdir(filepath.Join(outDir, "user_gen.go"), 0755))
 
 		err := New(
@@ -342,7 +378,28 @@ func TestGenPropsGenerate_ErrorScenarios(t *testing.T) {
 			WithPackageName("model"),
 		).Generate(&user{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "write file failed")
+		assert.Contains(t, err.Error(), "read existing file")
+		assert.Contains(t, err.Error(), "failed")
+	})
+
+	t.Run("write file failed on read-only dir", func(t *testing.T) {
+		baseDir := t.TempDir()
+		outDir := filepath.Join(baseDir, "readonly")
+		require.NoError(t, os.Mkdir(outDir, 0755))
+		// Make the directory read-only so os.ReadFile returns ErrNotExist (treated as "exists=false"),
+		// while os.WriteFile fails with a permission error.
+		require.NoError(t, os.Chmod(outDir, 0555))
+		t.Cleanup(func() {
+			_ = os.Chmod(outDir, 0755)
+		})
+
+		err := New(
+			WithOutputDir(outDir),
+			WithPackageName("model"),
+		).Generate(&user{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "write file")
+		assert.Contains(t, err.Error(), "failed")
 	})
 }
 

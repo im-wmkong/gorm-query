@@ -11,7 +11,6 @@ package colgen
 import (
 	"bytes"
 	"fmt"
-	"go/token"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,6 +18,7 @@ import (
 	"github.com/dave/jennifer/jen"
 	"github.com/im-wmkong/gorm-query/internal/fsx"
 	"github.com/im-wmkong/gorm-query/internal/reflectx"
+	"github.com/im-wmkong/gorm-query/internal/slicex"
 	"gorm.io/gorm/schema"
 )
 
@@ -97,19 +97,25 @@ func (g *Generator) Generate(models ...any) error {
 }
 
 func (g *Generator) filterNilModels(models []any) ([]any, int) {
-	filtered := make([]any, 0, len(models))
-	for _, model := range models {
-		if model != nil {
-			filtered = append(filtered, model)
-		}
-	}
+	filtered := slicex.Filter(models, func(model any) bool {
+		return model != nil
+	})
 	return filtered, len(models) - len(filtered)
 }
 
 func (g *Generator) checkSamePackage(models []any) error {
-	pkgName := reflectx.PackageName(models[0])
+	if len(models) <= 1 {
+		return nil
+	}
+	pkgName, ok := reflectx.PackageName(models[0])
+	if !ok {
+		return fmt.Errorf("model %T has no package path (anonymous or built-in types are not supported)", models[0])
+	}
 	for _, model := range models[1:] {
-		currentPkg := reflectx.PackageName(model)
+		currentPkg, ok := reflectx.PackageName(model)
+		if !ok {
+			return fmt.Errorf("model %T has no package path (anonymous or built-in types are not supported)", model)
+		}
 		if currentPkg != pkgName {
 			return fmt.Errorf("all models must be in the same package, but found %q and %q", pkgName, currentPkg)
 		}
@@ -123,7 +129,7 @@ func (g *Generator) packageName() (string, error) {
 		return g.cfg.packageName, nil
 	}
 
-	if outputPkg := g.outputDirPackageName(); outputPkg != "" {
+	if outputPkg := fsx.InferPackageNameFromPath(g.cfg.outputDir); outputPkg != "" {
 		g.cfg.logger.Debug("inferred package name from output dir: %s", outputPkg)
 		return outputPkg, nil
 	}
@@ -134,20 +140,12 @@ func (g *Generator) packageName() (string, error) {
 	)
 }
 
-func (g *Generator) outputDirPackageName() string {
-	base := filepath.Base(filepath.Clean(g.cfg.outputDir))
-	if token.IsIdentifier(base) {
-		return base
-	}
-	return ""
-}
-
 func (g *Generator) checkOutputDir(pkgName string) error {
 	if err := os.MkdirAll(g.cfg.outputDir, 0755); err != nil {
 		return fmt.Errorf("create output dir failed: %w", err)
 	}
 
-	fsPkg, err := fsx.PackageNameFromDir(g.cfg.outputDir)
+	fsPkg, err := fsx.ReadPackageNameFromDir(g.cfg.outputDir)
 	if err != nil {
 		return fmt.Errorf("detect package failed: %w", err)
 	}
@@ -228,8 +226,16 @@ func (g *Generator) outputFile(sch *schema.Schema) string {
 }
 
 func (g *Generator) writeFile(filename string, content []byte) error {
+	old, err := os.ReadFile(filename)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read existing file %s failed: %w", filename, err)
+	}
+	exists := err == nil
+
 	if g.cfg.dryRun {
-		old, _ := os.ReadFile(filename)
+		if !exists {
+			return fmt.Errorf("generated file missing: %s", filename)
+		}
 		if !bytes.Equal(old, content) {
 			return fmt.Errorf("generated file outdated: %s", filename)
 		}
@@ -237,15 +243,13 @@ func (g *Generator) writeFile(filename string, content []byte) error {
 		return nil
 	}
 
-	if old, err := os.ReadFile(filename); err == nil {
-		if bytes.Equal(old, content) {
-			g.cfg.logger.Debug("skipped writing %s: content unchanged", filename)
-			return nil
-		}
+	if exists && bytes.Equal(old, content) {
+		g.cfg.logger.Debug("skipped writing %s: content unchanged", filename)
+		return nil
 	}
 
 	if err := os.WriteFile(filename, content, 0644); err != nil {
-		return fmt.Errorf("write file failed: %w", err)
+		return fmt.Errorf("write file %s failed: %w", filename, err)
 	}
 
 	g.cfg.logger.Info("generated %s", filename)

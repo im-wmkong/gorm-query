@@ -44,3 +44,26 @@ func TestGormxBuildNested(t *testing.T) {
 	assert.Equal(t, "Bob", users[0].UserName)
 	assert.Equal(t, 30, users[0].Age)
 }
+
+func TestGormxBuildNested_EmptyConds(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "db")
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	require.NoError(t, err)
+
+	base := db.Model(&user{})
+	nested := BuildNested(base, []func(*gorm.DB) *gorm.DB{})
+	require.NotNil(t, nested)
+
+	// Empty conds must yield a fresh NewDB session without any clauses inherited from base.
+	_, polluted := nested.Statement.Clauses["WHERE"]
+	assert.False(t, polluted)
+}
+
+func TestGormxBuildNested_NilConds(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "db")
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	require.NoError(t, err)
+
+	nested := BuildNested[func(*gorm.DB) *gorm.DB](db.Model(&user{}), nil)
+	require.NotNil(t, nested)
+}
