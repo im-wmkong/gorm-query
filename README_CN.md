@@ -124,6 +124,7 @@ err := qb.Apply(db).Find(&users).Error
 
 `db.Client` 是 Service 层和 Repository 层之间的连接点：
 
+- `db.Client` 同时实现了 `db.DBProvider` 和 `db.Transactor`
 - Repository 只依赖 `db.DBProvider`
 - Service 只依赖 `db.Transactor`
 - 当前事务通过 `context.Context` 向下传递，因此你不需要手动传递 `*gorm.DB`
