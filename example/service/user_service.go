@@ -21,21 +21,21 @@ type UserService interface {
 
 // userService implements UserService.
 type userService struct {
-	repo       repository.UserRepository // Keep a concrete repo reference if you need custom methods.
-	transactor db.Transactor
+	repo repository.UserRepository // Keep a concrete repo reference if you need custom methods.
+	tx   db.Transactor
 }
 
 // NewUserService creates a new user service.
-func NewUserService(repo repository.UserRepository, tm db.Transactor) UserService {
+func NewUserService(repo repository.UserRepository, tx db.Transactor) UserService {
 	return &userService{
-		repo:       repo,
-		transactor: tm,
+		repo: repo,
+		tx:   tx,
 	}
 }
 
 // CreateUser creates a new user with basic validation.
 func (s *userService) CreateUser(ctx context.Context, user *model.User) error {
-	return s.transactor.Transaction(ctx, func(ctx context.Context) error {
+	return s.tx.Transaction(ctx, func(ctx context.Context) error {
 		// Check if the email already exists.
 		q := query.New().Where(columns.User.Email.Eq(user.Email))
 		count, err := s.repo.Count(ctx, q)
