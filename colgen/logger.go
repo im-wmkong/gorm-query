@@ -20,13 +20,13 @@ type defaultLogger struct {
 	l *log.Logger
 }
 
-// NewDefaultLogger creates a default Logger that writes to stderr.
+// DefaultLogger creates a default Logger that writes to stderr.
 //
 // Example:
 //
-//	g := colgen.New(colgen.WithLogger(colgen.NewDefaultLogger()))
+//	g := colgen.New(colgen.WithLogger(colgen.DefaultLogger()))
 //	_ = g
-func NewDefaultLogger() Logger {
+func DefaultLogger() Logger {
 	return &defaultLogger{l: log.New(os.Stderr, "[colgen] ", log.LstdFlags)}
 }
 

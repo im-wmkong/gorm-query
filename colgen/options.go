@@ -18,7 +18,7 @@ func defaultConfig() config {
 		namingStrategy: schema.NamingStrategy{
 			SingularTable: true,
 		},
-		logger: NewDefaultLogger(),
+		logger: DefaultLogger(),
 	}
 }
 
