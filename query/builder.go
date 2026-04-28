@@ -2,7 +2,7 @@
 //
 // It builds queries dynamically via the functional Condition pattern and supports
 // deep-copying (Clone) to avoid condition slice aliasing across derived queries.
-// It is typically used together with the generated props (e.g. UserProps) to
+// It is typically used together with the generated columns (e.g. columns.User) to
 // provide a smooth, type-safe, chainable SQL building experience.
 package query
 
@@ -22,11 +22,11 @@ type Condition func(db *gorm.DB) *gorm.DB
 //
 // Example:
 //
-//	// Build conditions with generated props, then apply to *gorm.DB.
+//	// Build conditions with generated columns, then apply to *gorm.DB.
 //	qb := query.New().Where(
-//	    UserProps.Status.Eq(1),
-//	    UserProps.Age.Gte(18),
-//	).Order(UserProps.CreatedAt.Desc()).Page(1, 20)
+//	    columns.User.Status.Eq(1),
+//	    columns.User.Age.Gte(18),
+//	).Order(columns.User.CreatedAt.Desc()).Page(1, 20)
 //
 //	session := qb.Apply(db.Model(&User{}))
 //	_ = session
@@ -48,7 +48,7 @@ func New() *Builder {
 //
 // Example:
 //
-//	session := query.New().Where(UserProps.Age.Gt(18)).Apply(db.Model(&User{}))
+//	session := query.New().Where(columns.User.Age.Gt(18)).Apply(db.Model(&User{}))
 //	_ = session
 func (b *Builder) Apply(db *gorm.DB) *gorm.DB {
 	for _, cond := range b.conditions {
@@ -61,9 +61,9 @@ func (b *Builder) Apply(db *gorm.DB) *gorm.DB {
 //
 // Example:
 //
-//	base := query.New().Where(UserProps.Status.Eq(1))
-//	q1 := base.Clone().Where(UserProps.Age.Gte(18))
-//	q2 := base.Clone().Where(UserProps.Age.Lt(18))
+//	base := query.New().Where(columns.User.Status.Eq(1))
+//	q1 := base.Clone().Where(columns.User.Age.Gte(18))
+//	q2 := base.Clone().Where(columns.User.Age.Lt(18))
 //	_, _ = q1, q2
 func (b *Builder) Clone() *Builder {
 	conditions := make([]Condition, len(b.conditions))
@@ -75,7 +75,7 @@ func (b *Builder) Clone() *Builder {
 //
 // Example:
 //
-//	qb := query.New().Where(UserProps.Email.Like("%example.com%"))
+//	qb := query.New().Where(columns.User.Email.Like("%example.com%"))
 //	_ = qb
 func (b *Builder) Where(conds ...Condition) *Builder {
 	return b.bind(conds...)
@@ -86,7 +86,7 @@ func (b *Builder) Where(conds ...Condition) *Builder {
 // Example:
 //
 //	// WHERE (status = 1) OR (status = 2)
-//	qb := query.New().Or(UserProps.Status.Eq(1), UserProps.Status.Eq(2))
+//	qb := query.New().Or(columns.User.Status.Eq(1), columns.User.Status.Eq(2))
 //	_ = qb
 func (b *Builder) Or(conds ...Condition) *Builder {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
@@ -99,7 +99,7 @@ func (b *Builder) Or(conds ...Condition) *Builder {
 // Example:
 //
 //	// WHERE NOT (status = 0)
-//	qb := query.New().Not(UserProps.Status.Eq(0))
+//	qb := query.New().Not(columns.User.Status.Eq(0))
 //	_ = qb
 func (b *Builder) Not(conds ...Condition) *Builder {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
@@ -112,7 +112,7 @@ func (b *Builder) Not(conds ...Condition) *Builder {
 // Example:
 //
 //	// SELECT user_name, email
-//	qb := query.New().Select(UserProps.UserName, UserProps.Email)
+//	qb := query.New().Select(columns.User.UserName, columns.User.Email)
 //	_ = qb
 func (b *Builder) Select(query any, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -125,7 +125,7 @@ func (b *Builder) Select(query any, args ...any) *Builder {
 // Example:
 //
 //	// Omit columns by Column (generated props)
-//	qb := query.New().Omit(UserProps.UpdatedAt, UserProps.DeletedAt)
+//	qb := query.New().Omit(columns.User.UpdatedAt, columns.User.DeletedAt)
 //	_ = qb
 func (b *Builder) Omit(columns ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -138,7 +138,7 @@ func (b *Builder) Omit(columns ...any) *Builder {
 // Example:
 //
 //	// SELECT DISTINCT email
-//	qb := query.New().Distinct(UserProps.Email)
+//	qb := query.New().Distinct(columns.User.Email)
 //	_ = qb
 func (b *Builder) Distinct(args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -174,7 +174,7 @@ func (b *Builder) Preload(query string, args ...any) *Builder {
 //
 // Example:
 //
-//	qb := query.New().Group(UserProps.Status)
+//	qb := query.New().Group(columns.User.Status)
 //	_ = qb
 func (b *Builder) Group(name any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -186,7 +186,7 @@ func (b *Builder) Group(name any) *Builder {
 //
 // Example:
 //
-//	qb := query.New().Group(UserProps.Status).Having("COUNT(*) > ?", 10)
+//	qb := query.New().Group(columns.User.Status).Having("COUNT(*) > ?", 10)
 //	_ = qb
 func (b *Builder) Having(query any, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -198,7 +198,7 @@ func (b *Builder) Having(query any, args ...any) *Builder {
 //
 // Example:
 //
-//	qb := query.New().Order(UserProps.CreatedAt.Desc())
+//	qb := query.New().Order(columns.User.CreatedAt.Desc())
 //	_ = qb
 func (b *Builder) Order(col any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {

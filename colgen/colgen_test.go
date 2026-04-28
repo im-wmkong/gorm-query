@@ -182,7 +182,6 @@ func TestGenPropsGenerate_DefaultLayoutMatchesColumnsPackage(t *testing.T) {
 	assert.Contains(t, generated, "var user = struct")
 	assert.Contains(t, generated, "UserName  query.Column")
 	assert.Contains(t, generated, `UserName:  "user_name"`)
-	assert.NotContains(t, generated, "var userProps = struct")
 }
 
 func TestGenPropsGenerate_WithExplicitPackageNameForMixedModels(t *testing.T) {

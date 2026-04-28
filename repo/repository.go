@@ -103,8 +103,8 @@ func (r *BaseRepository[T]) CreateInBatches(ctx context.Context, entities []*T, 
 //
 // Example:
 //
-//	qb := query.New().Where(UserProps.ID.Eq(1))
-//	rows, err := r.Update(ctx, qb, UserProps.Status, 2)
+//	qb := query.New().Where(columns.User.ID.Eq(1))
+//	rows, err := r.Update(ctx, qb, columns.User.Status, 2)
 //	_, _ = rows, err
 func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, column query.Column, value any) (int64, error) {
 	result := r.buildQuery(ctx, qb).Update(column.String(), value)
@@ -115,8 +115,8 @@ func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder, colum
 //
 // Example:
 //
-//	qb := query.New().Where(UserProps.ID.Eq(1))
-//	rows, err := r.Updates(ctx, qb, map[query.Column]any{UserProps.Status: 2, UserProps.Email: "a@b.com"})
+//	qb := query.New().Where(columns.User.ID.Eq(1))
+//	rows, err := r.Updates(ctx, qb, map[query.Column]any{columns.User.Status: 2, columns.User.Email: "a@b.com"})
 //	_, _ = rows, err
 func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, values any) (int64, error) {
 	if mapVals, ok := values.(map[query.Column]any); ok {
@@ -130,7 +130,7 @@ func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder, valu
 //
 // Example:
 //
-//	qb := query.New().Where(UserProps.ID.Eq(1))
+//	qb := query.New().Where(columns.User.ID.Eq(1))
 //	rows, err := r.Delete(ctx, qb)
 //	_, _ = rows, err
 func (r *BaseRepository[T]) Delete(ctx context.Context, qb *query.Builder) (int64, error) {
@@ -143,7 +143,7 @@ func (r *BaseRepository[T]) Delete(ctx context.Context, qb *query.Builder) (int6
 //
 // Example:
 //
-//	qb := query.New().Where(UserProps.Status.Eq(1)).Order(UserProps.CreatedAt.Desc())
+//	qb := query.New().Where(columns.User.Status.Eq(1)).Order(columns.User.CreatedAt.Desc())
 //	users, err := r.Find(ctx, qb)
 //	_, _ = users, err
 func (r *BaseRepository[T]) Find(ctx context.Context, qb *query.Builder) ([]*T, error) {
@@ -157,7 +157,7 @@ func (r *BaseRepository[T]) Find(ctx context.Context, qb *query.Builder) ([]*T, 
 //
 // Example:
 //
-//	qb := query.New().Where(UserProps.Email.Eq("alice@example.com"))
+//	qb := query.New().Where(columns.User.Email.Eq("alice@example.com"))
 //	user, err := r.First(ctx, qb)
 //	_, _ = user, err
 func (r *BaseRepository[T]) First(ctx context.Context, qb *query.Builder) (*T, error) {
@@ -174,7 +174,7 @@ func (r *BaseRepository[T]) First(ctx context.Context, qb *query.Builder) (*T, e
 //
 // Example:
 //
-//	user, err := r.Take(ctx, query.New().Where(UserProps.ID.Eq(1)))
+//	user, err := r.Take(ctx, query.New().Where(columns.User.ID.Eq(1)))
 //	_, _ = user, err
 func (r *BaseRepository[T]) Take(ctx context.Context, qb *query.Builder) (*T, error) {
 	var entity T
@@ -205,7 +205,7 @@ func (r *BaseRepository[T]) Last(ctx context.Context, qb *query.Builder) (*T, er
 //
 // Example:
 //
-//	n, err := r.Count(ctx, query.New().Where(UserProps.Status.Eq(1)))
+//	n, err := r.Count(ctx, query.New().Where(columns.User.Status.Eq(1)))
 //	_, _ = n, err
 func (r *BaseRepository[T]) Count(ctx context.Context, qb *query.Builder) (int64, error) {
 	var count int64
@@ -218,7 +218,7 @@ func (r *BaseRepository[T]) Count(ctx context.Context, qb *query.Builder) (int64
 // Example:
 //
 //	var emails []string
-//	err := r.Pluck(ctx, query.New().Where(UserProps.Status.Eq(1)), UserProps.Email, &emails)
+//	err := r.Pluck(ctx, query.New().Where(columns.User.Status.Eq(1)), columns.User.Email, &emails)
 //	_ = err
 func (r *BaseRepository[T]) Pluck(ctx context.Context, qb *query.Builder, column query.Column, dest any) error {
 	return r.buildQuery(ctx, qb).Pluck(column.String(), dest).Error
