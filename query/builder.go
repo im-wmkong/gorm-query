@@ -2,7 +2,7 @@
 //
 // It builds queries dynamically via the functional Condition pattern and supports
 // deep-copying (Clone) to avoid condition slice aliasing across derived queries.
-// It is typically used together with the generated columns (e.g. columns.User) to
+// It is typically used together with the generated schema (e.g. schema.User) to
 // provide a smooth, type-safe, chainable SQL building experience.
 package query
 
@@ -24,9 +24,9 @@ type Condition func(db *gorm.DB) *gorm.DB
 //
 //	// Build conditions with generated columns, then apply to *gorm.DB.
 //	qb := query.New().Where(
-//	    columns.User.Status.Eq(1),
-//	    columns.User.Age.Gte(18),
-//	).Order(columns.User.CreatedAt.Desc()).Page(1, 20)
+//	    schema.User.Status.Eq(1),
+//	    schema.User.Age.Gte(18),
+//	).Order(schema.User.CreatedAt.Desc()).Page(1, 20)
 //
 //	session := qb.Apply(db.Model(&User{}))
 //	_ = session
@@ -48,7 +48,7 @@ func New() *Builder {
 //
 // Example:
 //
-//	session := query.New().Where(columns.User.Age.Gt(18)).Apply(db.Model(&User{}))
+//	session := query.New().Where(schema.User.Age.Gt(18)).Apply(db.Model(&User{}))
 //	_ = session
 func (b *Builder) Apply(db *gorm.DB) *gorm.DB {
 	for _, cond := range b.conditions {
@@ -61,9 +61,9 @@ func (b *Builder) Apply(db *gorm.DB) *gorm.DB {
 //
 // Example:
 //
-//	base := query.New().Where(columns.User.Status.Eq(1))
-//	q1 := base.Clone().Where(columns.User.Age.Gte(18))
-//	q2 := base.Clone().Where(columns.User.Age.Lt(18))
+//	base := query.New().Where(schema.User.Status.Eq(1))
+//	q1 := base.Clone().Where(schema.User.Age.Gte(18))
+//	q2 := base.Clone().Where(schema.User.Age.Lt(18))
 //	_, _ = q1, q2
 func (b *Builder) Clone() *Builder {
 	conditions := make([]Condition, len(b.conditions))
@@ -75,7 +75,7 @@ func (b *Builder) Clone() *Builder {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Email.Like("%example.com%"))
+//	qb := query.New().Where(schema.User.Email.Like("%example.com%"))
 //	_ = qb
 func (b *Builder) Where(conds ...Condition) *Builder {
 	return b.bind(conds...)
@@ -86,7 +86,7 @@ func (b *Builder) Where(conds ...Condition) *Builder {
 // Example:
 //
 //	// WHERE (status = 1) OR (status = 2)
-//	qb := query.New().Or(columns.User.Status.Eq(1), columns.User.Status.Eq(2))
+//	qb := query.New().Or(schema.User.Status.Eq(1), schema.User.Status.Eq(2))
 //	_ = qb
 func (b *Builder) Or(conds ...Condition) *Builder {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
@@ -99,7 +99,7 @@ func (b *Builder) Or(conds ...Condition) *Builder {
 // Example:
 //
 //	// WHERE NOT (status = 0)
-//	qb := query.New().Not(columns.User.Status.Eq(0))
+//	qb := query.New().Not(schema.User.Status.Eq(0))
 //	_ = qb
 func (b *Builder) Not(conds ...Condition) *Builder {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
@@ -112,11 +112,11 @@ func (b *Builder) Not(conds ...Condition) *Builder {
 // Example:
 //
 //	// SELECT user_name, email
-//	qb := query.New().Select(columns.User.UserName, columns.User.Email)
+//	qb := query.New().Select(schema.User.UserName, schema.User.Email)
 //	_ = qb
-func (b *Builder) Select(query any, args ...any) *Builder {
+func (b *Builder) Select(expr any, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Select(column.Value(query), column.Values(args)...)
+		return db.Select(column.Value(expr), column.Values(args)...)
 	})
 }
 
@@ -124,12 +124,11 @@ func (b *Builder) Select(query any, args ...any) *Builder {
 //
 // Example:
 //
-//	// Omit columns by Column (generated props)
-//	qb := query.New().Omit(columns.User.UpdatedAt, columns.User.DeletedAt)
+//	qb := query.New().Omit(schema.User.UpdatedAt, schema.User.DeletedAt)
 //	_ = qb
-func (b *Builder) Omit(columns ...any) *Builder {
+func (b *Builder) Omit(cols ...Column) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Omit(column.ValuesTo[string](columns)...)
+		return db.Omit(column.ValuesTo[string](cols)...)
 	})
 }
 
@@ -138,35 +137,48 @@ func (b *Builder) Omit(columns ...any) *Builder {
 // Example:
 //
 //	// SELECT DISTINCT email
-//	qb := query.New().Distinct(columns.User.Email)
+//	qb := query.New().Distinct(schema.User.Email)
 //	_ = qb
-func (b *Builder) Distinct(args ...any) *Builder {
+func (b *Builder) Distinct(cols ...Column) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Distinct(column.Values(args)...)
+		return db.Distinct(column.Values(cols)...)
 	})
 }
 
-// Joins adds JOIN clauses.
+// Joins adds a raw JOIN clause. args are bound to ? placeholders in sql.
 //
 // Example:
 //
 //	qb := query.New().Joins("JOIN profiles ON profiles.user_id = users.id")
 //	_ = qb
-func (b *Builder) Joins(query string, args ...any) *Builder {
+func (b *Builder) Joins(sql string, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Joins(query, column.Values(args)...)
+		return db.Joins(sql, args...)
 	})
 }
 
-// Preload preloads associations.
+// Preload preloads an association. Extra conditions (if provided) are applied
+// to the preload query as a nested scope.
 //
 // Example:
 //
-//	qb := query.New().Preload("Profile")
+//	// Simple preload
+//	qb := query.New().Preload(schema.User.Profile)
+//
+//	// Preload with conditions on the associated rows
+//	qb = query.New().Preload(schema.User.Orders, schema.Order.Status.Eq(1))
 //	_ = qb
-func (b *Builder) Preload(query string, args ...any) *Builder {
+func (b *Builder) Preload(assoc Association, conds ...Condition) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Preload(query, column.Values(args)...)
+		if len(conds) == 0 {
+			return db.Preload(assoc.String())
+		}
+		return db.Preload(assoc.String(), func(tx *gorm.DB) *gorm.DB {
+			for _, cond := range conds {
+				tx = cond(tx)
+			}
+			return tx
+		})
 	})
 }
 
@@ -174,23 +186,23 @@ func (b *Builder) Preload(query string, args ...any) *Builder {
 //
 // Example:
 //
-//	qb := query.New().Group(columns.User.Status)
+//	qb := query.New().Group(schema.User.Status)
 //	_ = qb
-func (b *Builder) Group(name any) *Builder {
+func (b *Builder) Group(col Column) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Group(column.ValueTo[string](name))
+		return db.Group(col.String())
 	})
 }
 
-// Having adds HAVING.
+// Having adds HAVING. args are bound to ? placeholders in expr.
 //
 // Example:
 //
-//	qb := query.New().Group(columns.User.Status).Having("COUNT(*) > ?", 10)
+//	qb := query.New().Group(schema.User.Status).Having("COUNT(*) > ?", 10)
 //	_ = qb
-func (b *Builder) Having(query any, args ...any) *Builder {
+func (b *Builder) Having(expr string, args ...any) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Having(column.Value(query), column.Values(args)...)
+		return db.Having(expr, args...)
 	})
 }
 
@@ -198,11 +210,11 @@ func (b *Builder) Having(query any, args ...any) *Builder {
 //
 // Example:
 //
-//	qb := query.New().Order(columns.User.CreatedAt.Desc())
+//	qb := query.New().Order(schema.User.CreatedAt.Desc())
 //	_ = qb
-func (b *Builder) Order(col any) *Builder {
+func (b *Builder) Order(col Column) *Builder {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Order(column.Value(col))
+		return db.Order(col.String())
 	})
 }
 

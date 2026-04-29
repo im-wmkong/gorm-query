@@ -10,7 +10,7 @@
 
 ## ✨ 核心特性
 
-- 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `columns.User.Age.Gt(18)`，在编译期拦截字段名拼写错误。
+- 🛡️ **强类型查询构建**：告别 `db.Where("age > ?", 18)`，拥抱 `schema.User.Age.Gt(18)`，在编译期拦截字段名拼写错误。
 - 📦 **开箱即用的泛型仓储**：提供 `repo.BaseRepository[T]`，一行代码拥有完整的 CRUD 能力。
 - 🎯 **告别臃肿的 Repository**：结合通用 builder 查询构建器，按需动态组合查询条件，无需再为不同业务编写数十个 `FindByXxx` 方法。
 - 🔄 **隐式上下文事务**：基于 `context.Context` 传递事务，Service 层与 Repo 层彻底解耦，再也不用把 `*gorm.DB` 传来传去。
@@ -27,12 +27,12 @@ GORM Query 的核心能力由以下 4 个模块构成，它们各司其职，又
 
 | 模块 | 核心职责 | 典型能力 / 方法 |
 | :--- | :--- | :--- |
-| **`colgen`** | **代码生成** | 解析 GORM 模型生成强类型列定义。支持自定义输出目录、包名及 Dry-run 校验。 |
-| **`query`** | **动态查询构建** | **Builder**: `Where`, `Select`, `Joins`, `Preload`, `Page`, `Clone`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... |
+| **`colgen`** | **代码生成** | 解析 GORM 模型生成强类型 schema 定义（列 + 关联）。支持自定义输出目录、包名及 Dry-run 校验。 |
+| **`query`** | **动态查询构建** | **Builder**: `Where`, `Select`, `Joins`, `Preload`, `Page`, `Clone`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`, `String`... |
 | **`repo`** | **泛型仓储** | 提供通用 CRUD：`Create`, `Find`, `First`, `Update`, `Delete`, `Count`, `Pluck`... |
 | **`db`** | **上下文事务管理** | 提供 `db.Client`，支持通过 `context.Context` 无感传递事务连接，避免手动透传 DB。 |
 
-**最佳上手路径：** `colgen` 生成列定义 ➔ 使用 `columns.Xxx` 构建 `query` ➔ 传入 `repo` 执行。
+**最佳上手路径：** `colgen` 生成 schema 定义 ➔ 使用 `schema.Xxx` 构建 `query` ➔ 传入 `repo` 执行。
 
 ## 🚀 快速开始
 
@@ -56,7 +56,7 @@ type User struct {
 
 ### 2. 配置并执行代码生成
 
-创建一个简单的生成脚本（例如放在 `cmd/gen/main.go`），将你需要生成查询列定义的模型传入生成器：
+创建一个简单的生成脚本（例如放在 `cmd/gen/main.go`），将你需要生成 schema 定义的模型传入生成器：
 
 ```go
 package main
@@ -83,21 +83,21 @@ func main() {
 ```bash
 go run cmd/gen/main.go
 ```
-*这会自动生成一个代码文件（例如 `model/columns/user_gen.go`），其中包含 `columns.User` 变量。*
+*这会自动生成一个代码文件（例如 `model/schema/user_gen.go`），其中包含 `schema.User` 变量。*
 
-默认情况下，`colgen` 会把生成结果写入独立的 `columns` 包中。
+默认情况下，`colgen` 会把生成结果写入独立的 `schema` 包中。
 
 > **💡 进阶提示：** 你也可以在任意 Go 文件的头部添加 `//go:generate go run cmd/gen/main.go`，之后就能通过在项目根目录运行 `go generate ./...` 将其无缝接入你的标准工作流。
 
 ### 3. 享受丝滑的强类型查询
 
-现在，你可以使用生成的 `columns.User` 配合 Query Builder 进行类型安全的查询了：
+现在，你可以使用生成的 `schema.User` 配合 Query Builder 进行类型安全的查询了：
 
 ```go
 import (
     "gorm.io/gorm"
 
-    "your_project_name/model/columns"
+    "your_project_name/model/schema"
     "your_project_name/model"
     "github.com/im-wmkong/gorm-query/query"
 )
@@ -107,11 +107,11 @@ var db *gorm.DB
 // 1. 丝滑地构建查询条件
 qb := query.New().
     Where(
-        columns.User.Age.Gte(18),
-        columns.User.UserName.Contains("wmkong"),
+        schema.User.Age.Gte(18),
+        schema.User.UserName.Contains("wmkong"),
     ).
     Page(1, 20).
-    Order(columns.User.ID.Desc())
+    Order(schema.User.ID.Desc())
 
 // 2. 应用到 gorm.DB
 var users []model.User
@@ -195,15 +195,15 @@ func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User
 func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name string, minAge int) ([]*model.User, error) {
     // 1. 使用 builder 自由组合查询条件
     qb := query.New().Where(
-        columns.User.Status.Eq(1), // 默认条件
+        schema.User.Status.Eq(1), // 默认条件
     )
 
     // 2. 动态追加条件
     if name != "" {
-        qb = qb.Where(columns.User.UserName.Contains(name))
+        qb = qb.Where(schema.User.UserName.Contains(name))
     }
     if minAge > 0 {
-        qb = qb.Where(columns.User.Age.Gte(minAge))
+        qb = qb.Where(schema.User.Age.Gte(minAge))
     }
 
     // 3. 直接将 builder 传递给 BaseRepository 的 Find 方法，无需在 repo 新增任何方法！
@@ -223,13 +223,13 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
 它可以防止底层切片共享带来的条件污染：
 
 ```go
-baseQuery := query.New().Where(columns.User.Status.Eq(1))
+baseQuery := query.New().Where(schema.User.Status.Eq(1))
 
 // 派生查询 A
-adultsQuery := baseQuery.Clone().Where(columns.User.Age.Gte(18))
+adultsQuery := baseQuery.Clone().Where(schema.User.Age.Gte(18))
 
 // 派生查询 B (不会包含 Age >= 18 的条件)
-minorsQuery := baseQuery.Clone().Where(columns.User.Age.Lt(18))
+minorsQuery := baseQuery.Clone().Where(schema.User.Age.Lt(18))
 ```
 
 ## 🤝 参与贡献

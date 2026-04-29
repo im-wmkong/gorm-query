@@ -20,7 +20,7 @@ func main() {
 	}
 
 	// Auto-migrate schema (demo only).
-	_ = gormDB.AutoMigrate(&model.User{})
+	_ = gormDB.AutoMigrate(&model.User{}, &model.Profile{})
 
 	// 2) Initialize the core component: db.Client.
 	// It implements both db.DBProvider (for repos) and db.Transactor (for services).
@@ -34,11 +34,12 @@ func main() {
 	ctx := context.Background()
 
 	// Demo 1: execute transactional business logic via the Service.
-	err = userService.CreateUser(ctx, &model.User{
+	user := &model.User{
 		UserName: "Alice",
 		Age:      18,
 		Email:    "alice@example.com",
-	})
+	}
+	err = userService.CreateUser(ctx, user)
 	if err != nil {
 		log.Printf("CreateUser failed: %v", err)
 	}

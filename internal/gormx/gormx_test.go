@@ -2,12 +2,14 @@ package gormx
 
 import (
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 type user struct {
@@ -66,4 +68,51 @@ func TestGormxBuildNested_NilConds(t *testing.T) {
 
 	nested := BuildNested[func(*gorm.DB) *gorm.DB](db.Model(&user{}), nil)
 	require.NotNil(t, nested)
+}
+
+type relUser struct {
+	gorm.Model
+	Name    string
+	Profile *relProfile
+	Orders  []*relOrder
+}
+
+type relProfile struct {
+	gorm.Model
+	RelUserID uint
+}
+
+type relOrder struct {
+	gorm.Model
+	RelUserID uint
+}
+
+func TestGormxRelationNames_StableOrder(t *testing.T) {
+	sch, err := schema.Parse(&relUser{}, &sync.Map{}, schema.NamingStrategy{})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"Profile", "Orders"}, RelationNames(sch))
+}
+
+func TestGormxRelationNames_NilRelations(t *testing.T) {
+	// Zero-value schema has nil Relationships.Relations.
+	sch := &schema.Schema{}
+	assert.Nil(t, RelationNames(sch))
+}
+
+func TestGormxRelationNames_DuplicateFields(t *testing.T) {
+	// Cover the internal `seen` de-dup branch.
+	sch := &schema.Schema{
+		Fields: []*schema.Field{
+			{Name: "Profile"},
+			{Name: "Profile"},
+			{Name: "Orders"},
+		},
+		Relationships: schema.Relationships{Relations: map[string]*schema.Relationship{
+			"Profile": {},
+			"Orders":  {},
+		}},
+	}
+
+	assert.Equal(t, []string{"Profile", "Orders"}, RelationNames(sch))
 }

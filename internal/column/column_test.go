@@ -19,14 +19,14 @@ func TestColumn(t *testing.T) {
 		assert.Equal(t, "status", Value(args[0]))
 		assert.Equal(t, 42, Value(args[1]))
 		assert.Equal(t, []any{"status", 42}, Values(args))
-		assert.Nil(t, Values(nil))
+		assert.Nil(t, Values[any](nil))
 	})
 
 	t.Run("ValueTo and ValuesTo keep zero values on mismatch", func(t *testing.T) {
 		assert.Equal(t, "name", ValueTo[string](stringerValue("name")))
 		assert.Equal(t, "123", ValueTo[string](123))
 		assert.Equal(t, []string{"status", "10"}, ValuesTo[string]([]any{stringerValue("status"), 10}))
-		assert.Nil(t, ValuesTo[string](nil))
+		assert.Nil(t, ValuesTo[string, any](nil))
 	})
 
 	t.Run("ToStringMap converts map to string values", func(t *testing.T) {

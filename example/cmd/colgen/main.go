@@ -10,7 +10,7 @@ import (
 func main() {
 	g := colgen.New()
 
-	if err := g.Generate(&model.User{}); err != nil {
+	if err := g.Generate(&model.User{}, &model.Profile{}); err != nil {
 		log.Fatal(err)
 	}
 }

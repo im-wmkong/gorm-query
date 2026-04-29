@@ -9,6 +9,10 @@ type User struct {
 	Email    string `gorm:"column:email;size:255;unique"`
 	Age      int    `gorm:"column:age"`
 	Status   int    `gorm:"column:status;default:1"` // 1: active, 0: inactive
+
+	// Profile demonstrates a has-one association.
+	// It will be linked via Profile.UserID -> User.ID.
+	Profile *Profile
 }
 
 // TableName overrides the default table name to `users`.

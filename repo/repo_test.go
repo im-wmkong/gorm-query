@@ -23,7 +23,7 @@ type user struct {
 	Status   int    `gorm:"column:status;default:1"`
 }
 
-var userColumns = struct {
+var userSchema = struct {
 	ID       query.Column
 	UserName query.Column
 	Email    query.Column
@@ -68,14 +68,14 @@ func TestBaseRepository_CRUD(t *testing.T) {
 	assert.Equal(t, int64(3), count)
 
 	// Find
-	users, err := r.Find(ctx, query.New().Where(userColumns.Age.Gte(30)).Order(userColumns.Age.Asc()))
+	users, err := r.Find(ctx, query.New().Where(userSchema.Age.Gte(30)).Order(userSchema.Age.Asc()))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 	assert.Equal(t, "Bob", users[0].UserName)
 	assert.Equal(t, "Charlie", users[1].UserName)
 
 	// First
-	alice, err := r.First(ctx, query.New().Where(userColumns.UserName.Eq("Alice")))
+	alice, err := r.First(ctx, query.New().Where(userSchema.UserName.Eq("Alice")))
 	require.NoError(t, err)
 	require.NotNil(t, alice)
 	assert.Equal(t, "alice@example.com", alice.Email)
@@ -93,7 +93,7 @@ func TestBaseRepository_NotFoundReturnsNilEntity(t *testing.T) {
 	r := New[user](client)
 	ctx := context.Background()
 
-	got, err := r.Take(ctx, query.New().Where(userColumns.UserName.Eq("nobody")))
+	got, err := r.Take(ctx, query.New().Where(userSchema.UserName.Eq("nobody")))
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	require.Nil(t, got)
 }
@@ -106,18 +106,18 @@ func TestBaseRepository_UpdateAndUpdates(t *testing.T) {
 
 	seedUsers(t, r, ctx)
 
-	rows, err := r.Update(ctx, query.New().Where(userColumns.UserName.Eq("Bob")), userColumns.Age, 31)
+	rows, err := r.Update(ctx, query.New().Where(userSchema.UserName.Eq("Bob")), userSchema.Age, 31)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
 
-	rows, err = r.Updates(ctx, query.New().Where(userColumns.UserName.Eq("Bob")), map[query.Column]any{
-		userColumns.Status: 2,
-		userColumns.Email:  "bob2@example.com",
+	rows, err = r.Updates(ctx, query.New().Where(userSchema.UserName.Eq("Bob")), map[query.Column]any{
+		userSchema.Status: 2,
+		userSchema.Email:  "bob2@example.com",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
 
-	bob, err := r.First(ctx, query.New().Where(userColumns.UserName.Eq("Bob")))
+	bob, err := r.First(ctx, query.New().Where(userSchema.UserName.Eq("Bob")))
 	require.NoError(t, err)
 	require.NotNil(t, bob)
 	assert.Equal(t, 31, bob.Age)
@@ -138,7 +138,7 @@ func TestBaseRepository_CreateInBatches(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), rows)
 
-	count, err := r.Count(ctx, query.New().Where(userColumns.UserName.In([]string{"A", "B"})))
+	count, err := r.Count(ctx, query.New().Where(userSchema.UserName.In([]string{"A", "B"})))
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), count)
 }
@@ -151,7 +151,7 @@ func TestBaseRepository_Delete(t *testing.T) {
 
 	seedUsers(t, r, ctx)
 
-	rows, err := r.Delete(ctx, query.New().Where(userColumns.UserName.Eq("Alice")))
+	rows, err := r.Delete(ctx, query.New().Where(userSchema.UserName.Eq("Alice")))
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
 
@@ -179,7 +179,7 @@ func TestBaseRepository_Pluck(t *testing.T) {
 	seedUsers(t, r, ctx)
 
 	var names []string
-	err := r.Pluck(ctx, query.New().Order(userColumns.ID.Asc()), userColumns.UserName, &names)
+	err := r.Pluck(ctx, query.New().Order(userSchema.ID.Asc()), userSchema.UserName, &names)
 	require.NoError(t, err)
 	require.Equal(t, []string{"Alice", "Bob", "Charlie"}, names)
 }
@@ -228,7 +228,7 @@ func TestBaseRepository_Save(t *testing.T) {
 	u.Age = 26
 	require.NoError(t, r.Save(ctx, u))
 
-	got, err := r.First(ctx, query.New().Where(userColumns.Email.Eq("alice@example.com")))
+	got, err := r.First(ctx, query.New().Where(userSchema.Email.Eq("alice@example.com")))
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, 26, got.Age)
@@ -243,18 +243,18 @@ func TestBaseRepository_FirstTakeLast_SuccessAndNotFound(t *testing.T) {
 	seedUsers(t, r, ctx)
 
 	// Take success
-	got, err := r.Take(ctx, query.New().Where(userColumns.UserName.Eq("Bob")))
+	got, err := r.Take(ctx, query.New().Where(userSchema.UserName.Eq("Bob")))
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "Bob", got.UserName)
 
 	// First not found
-	gotFirst, err := r.First(ctx, query.New().Where(userColumns.UserName.Eq("nobody")))
+	gotFirst, err := r.First(ctx, query.New().Where(userSchema.UserName.Eq("nobody")))
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	require.Nil(t, gotFirst)
 
 	// Last not found
-	gotLast, err := r.Last(ctx, query.New().Where(userColumns.UserName.Eq("nobody")))
+	gotLast, err := r.Last(ctx, query.New().Where(userSchema.UserName.Eq("nobody")))
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	require.Nil(t, gotLast)
 }

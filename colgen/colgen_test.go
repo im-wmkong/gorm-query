@@ -62,7 +62,7 @@ func TestGeneratorResolvePackageName(t *testing.T) {
 		g := New()
 		pkgName, err := g.packageName()
 		require.NoError(t, err)
-		assert.Equal(t, "columns", pkgName)
+		assert.Equal(t, "schema", pkgName)
 	})
 
 	t.Run("inferred from custom output dir", func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestGenPropsGenerate_SuccessAndIdempotent(t *testing.T) {
 	assert.Equal(t, prevInfo+1, tl.infoCalls)
 }
 
-func TestGenPropsGenerate_DefaultLayoutMatchesColumnsPackage(t *testing.T) {
+func TestGenPropsGenerate_DefaultLayoutMatchesSchemaPackage(t *testing.T) {
 	workDir := t.TempDir()
 
 	originalWD, err := os.Getwd()
@@ -174,11 +174,11 @@ func TestGenPropsGenerate_DefaultLayoutMatchesColumnsPackage(t *testing.T) {
 	err = New().Generate(&user{})
 	require.NoError(t, err)
 
-	content, err := os.ReadFile(filepath.Join(workDir, "columns", "user_gen.go"))
+	content, err := os.ReadFile(filepath.Join(workDir, "schema", "user_gen.go"))
 	require.NoError(t, err)
 
 	generated := string(content)
-	assert.Contains(t, generated, "package columns")
+	assert.Contains(t, generated, "package schema")
 	assert.Contains(t, generated, "var user = struct")
 	assert.Contains(t, generated, "UserName  query.Column")
 	assert.Contains(t, generated, `UserName:  "user_name"`)
@@ -198,9 +198,9 @@ func TestGenPropsGenerate_WithExplicitPackageNameForMixedModels(t *testing.T) {
 	localContent, err := os.ReadFile(filepath.Join(outDir, "local_gen_props_model_gen.go"))
 	require.NoError(t, err)
 
-	assert.Contains(t, string(userContent), "user provides query columns for the user model.")
+	assert.Contains(t, string(userContent), "user provides query columns and associations for the user model.")
 	assert.Contains(t, string(userContent), "var user = struct")
-	assert.Contains(t, string(localContent), "localGenPropsModel provides query columns for the localGenPropsModel model.")
+	assert.Contains(t, string(localContent), "localGenPropsModel provides query columns and associations for the localGenPropsModel model.")
 	assert.Contains(t, string(localContent), "var localGenPropsModel = struct")
 	assert.Contains(t, string(localContent), `ID: "id"`)
 }
@@ -231,7 +231,7 @@ func TestGenPropsGenerate_SkipsIgnoredFields(t *testing.T) {
 	require.NoError(t, err)
 
 	generated := string(content)
-	assert.Contains(t, generated, "partiallyIgnoredGenPropsModel provides query columns for the partiallyIgnoredGenPropsModel model.")
+	assert.Contains(t, generated, "partiallyIgnoredGenPropsModel provides query columns and associations for the partiallyIgnoredGenPropsModel model.")
 	assert.Contains(t, generated, "ID:")
 	assert.Contains(t, generated, "Name query.Column")
 	assert.NotContains(t, generated, "Ignored query.Column")

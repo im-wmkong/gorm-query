@@ -12,22 +12,22 @@ import (
 //
 //	// WHERE age >= 18 AND email LIKE "%@example.com%"
 //	qb := query.New().Where(
-//	    columns.User.Age.Gte(18),
-//	    columns.User.Email.Like("%@example.com%"),
+//	    schema.User.Age.Gte(18),
+//	    schema.User.Email.Like("%@example.com%"),
 //	)
 //
 //	// ORDER BY created_at DESC
-//	qb = qb.Order(columns.User.CreatedAt.Desc())
+//	qb = qb.Order(schema.User.CreatedAt.Desc())
 //	_ = qb
 type Column string
 
-var _ fmt.Stringer = (*Column)(nil)
+var _ fmt.Stringer = Column("")
 
 // String returns the column as string.
 //
 // Example:
 //
-//	s := columns.User.Email.String()
+//	s := schema.User.Email.String()
 //	_ = s
 func (c Column) String() string {
 	return string(c)
@@ -37,7 +37,7 @@ func (c Column) String() string {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.ID.Eq(1))
+//	qb := query.New().Where(schema.User.ID.Eq(1))
 //	_ = qb
 func (c Column) Eq(val any) Condition {
 	return c.compare("=", val)
@@ -47,7 +47,7 @@ func (c Column) Eq(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Status.Neq(0))
+//	qb := query.New().Where(schema.User.Status.Neq(0))
 //	_ = qb
 func (c Column) Neq(val any) Condition {
 	return c.compare("<>", val)
@@ -57,7 +57,7 @@ func (c Column) Neq(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Age.Gt(18))
+//	qb := query.New().Where(schema.User.Age.Gt(18))
 //	_ = qb
 func (c Column) Gt(val any) Condition {
 	return c.compare(">", val)
@@ -67,7 +67,7 @@ func (c Column) Gt(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Age.Gte(18))
+//	qb := query.New().Where(schema.User.Age.Gte(18))
 //	_ = qb
 func (c Column) Gte(val any) Condition {
 	return c.compare(">=", val)
@@ -77,7 +77,7 @@ func (c Column) Gte(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Age.Lt(65))
+//	qb := query.New().Where(schema.User.Age.Lt(65))
 //	_ = qb
 func (c Column) Lt(val any) Condition {
 	return c.compare("<", val)
@@ -87,7 +87,7 @@ func (c Column) Lt(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Age.Lte(65))
+//	qb := query.New().Where(schema.User.Age.Lte(65))
 //	_ = qb
 func (c Column) Lte(val any) Condition {
 	return c.compare("<=", val)
@@ -97,7 +97,7 @@ func (c Column) Lte(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Email.Like("%@example.com%"))
+//	qb := query.New().Where(schema.User.Email.Like("%@example.com%"))
 //	_ = qb
 func (c Column) Like(val any) Condition {
 	return c.compare("LIKE", val)
@@ -107,7 +107,7 @@ func (c Column) Like(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Email.NotLike("%@example.com%"))
+//	qb := query.New().Where(schema.User.Email.NotLike("%@example.com%"))
 //	_ = qb
 func (c Column) NotLike(val any) Condition {
 	return c.compare("NOT LIKE", val)
@@ -117,7 +117,7 @@ func (c Column) NotLike(val any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.UserName.Contains("li"))
+//	qb := query.New().Where(schema.User.UserName.Contains("li"))
 //	_ = qb
 func (c Column) Contains(val string) Condition {
 	return c.compare("LIKE", "%"+val+"%")
@@ -127,7 +127,7 @@ func (c Column) Contains(val string) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.UserName.NotContains("admin"))
+//	qb := query.New().Where(schema.User.UserName.NotContains("admin"))
 //	_ = qb
 func (c Column) NotContains(val string) Condition {
 	return c.compare("NOT LIKE", "%"+val+"%")
@@ -137,7 +137,7 @@ func (c Column) NotContains(val string) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.UserName.HasPrefix("Al"))
+//	qb := query.New().Where(schema.User.UserName.HasPrefix("Al"))
 //	_ = qb
 func (c Column) HasPrefix(val string) Condition {
 	return c.compare("LIKE", val+"%")
@@ -147,7 +147,7 @@ func (c Column) HasPrefix(val string) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.UserName.HasSuffix("son"))
+//	qb := query.New().Where(schema.User.UserName.HasSuffix("son"))
 //	_ = qb
 func (c Column) HasSuffix(val string) Condition {
 	return c.compare("LIKE", "%"+val)
@@ -157,7 +157,7 @@ func (c Column) HasSuffix(val string) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.UserName.In([]string{"Alice", "Bob"}))
+//	qb := query.New().Where(schema.User.UserName.In([]string{"Alice", "Bob"}))
 //	_ = qb
 func (c Column) In(vals any) Condition {
 	return c.compare("IN", vals)
@@ -167,7 +167,7 @@ func (c Column) In(vals any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.UserName.NotIn([]string{"admin", "root"}))
+//	qb := query.New().Where(schema.User.UserName.NotIn([]string{"admin", "root"}))
 //	_ = qb
 func (c Column) NotIn(vals any) Condition {
 	return c.compare("NOT IN", vals)
@@ -177,7 +177,7 @@ func (c Column) NotIn(vals any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Age.Between(18, 30))
+//	qb := query.New().Where(schema.User.Age.Between(18, 30))
 //	_ = qb
 func (c Column) Between(start, end any) Condition {
 	return c.between("BETWEEN", start, end)
@@ -187,7 +187,7 @@ func (c Column) Between(start, end any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.Age.NotBetween(18, 30))
+//	qb := query.New().Where(schema.User.Age.NotBetween(18, 30))
 //	_ = qb
 func (c Column) NotBetween(start, end any) Condition {
 	return c.between("NOT BETWEEN", start, end)
@@ -197,7 +197,7 @@ func (c Column) NotBetween(start, end any) Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.DeletedAt.IsNull())
+//	qb := query.New().Where(schema.User.DeletedAt.IsNull())
 //	_ = qb
 func (c Column) IsNull() Condition {
 	return c.clause("IS NULL")
@@ -207,7 +207,7 @@ func (c Column) IsNull() Condition {
 //
 // Example:
 //
-//	qb := query.New().Where(columns.User.DeletedAt.IsNotNull())
+//	qb := query.New().Where(schema.User.DeletedAt.IsNotNull())
 //	_ = qb
 func (c Column) IsNotNull() Condition {
 	return c.clause("IS NOT NULL")
@@ -217,27 +217,27 @@ func (c Column) IsNotNull() Condition {
 //
 // Example:
 //
-//	qb := query.New().Order(columns.User.CreatedAt.Desc())
+//	qb := query.New().Order(schema.User.CreatedAt.Desc())
 //	_ = qb
-func (c Column) Desc() string {
-	return c.String() + " DESC"
+func (c Column) Desc() Column {
+	return Column(c.String() + " DESC")
 }
 
 // Asc returns an ORDER BY fragment: "column ASC".
 //
 // Example:
 //
-//	qb := query.New().Order(columns.User.CreatedAt.Asc())
+//	qb := query.New().Order(schema.User.CreatedAt.Asc())
 //	_ = qb
-func (c Column) Asc() string {
-	return c.String() + " ASC"
+func (c Column) Asc() Column {
+	return Column(c.String() + " ASC")
 }
 
 // Table qualifies the column with table name: "table.column".
 //
 // Example:
 //
-//	col := columns.User.Email.Table("users")
+//	col := schema.User.Email.Table("users")
 //	_ = col
 func (c Column) Table(name string) Column {
 	return Column(name + "." + c.String())
@@ -247,7 +247,7 @@ func (c Column) Table(name string) Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.Email.As("user_name"))
+//	qb := query.New().Select(schema.User.Email.As("user_name"))
 //	_ = qb
 func (c Column) As(alias string) Column {
 	return Column(c.String() + " AS " + alias)
@@ -257,7 +257,7 @@ func (c Column) As(alias string) Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.Email.Distinct())
+//	qb := query.New().Select(schema.User.Email.Distinct())
 //	_ = qb
 func (c Column) Distinct() Column {
 	return Column("DISTINCT " + c.String())
@@ -267,7 +267,7 @@ func (c Column) Distinct() Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.Age.Sum().As("age_sum"))
+//	qb := query.New().Select(schema.User.Age.Sum().As("age_sum"))
 //	_ = qb
 func (c Column) Sum() Column {
 	return Column("SUM(" + c.String() + ")")
@@ -277,7 +277,7 @@ func (c Column) Sum() Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.ID.Count().As("cnt"))
+//	qb := query.New().Select(schema.User.ID.Count().As("cnt"))
 //	_ = qb
 func (c Column) Count() Column {
 	return Column("COUNT(" + c.String() + ")")
@@ -287,7 +287,7 @@ func (c Column) Count() Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.Age.Avg().As("age_avg"))
+//	qb := query.New().Select(schema.User.Age.Avg().As("age_avg"))
 //	_ = qb
 func (c Column) Avg() Column {
 	return Column("AVG(" + c.String() + ")")
@@ -297,7 +297,7 @@ func (c Column) Avg() Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.Age.Max().As("age_max"))
+//	qb := query.New().Select(schema.User.Age.Max().As("age_max"))
 //	_ = qb
 func (c Column) Max() Column {
 	return Column("MAX(" + c.String() + ")")
@@ -307,7 +307,7 @@ func (c Column) Max() Column {
 //
 // Example:
 //
-//	qb := query.New().Select(columns.User.Age.Min().As("age_min"))
+//	qb := query.New().Select(schema.User.Age.Min().As("age_min"))
 //	_ = qb
 func (c Column) Min() Column {
 	return Column("MIN(" + c.String() + ")")
