@@ -1,3 +1,3 @@
 package model
 
-//go:generate go run ../cmd/colgen/main.go
+//go:generate go run ../cmd/schemagen/main.go

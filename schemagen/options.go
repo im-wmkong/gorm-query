@@ -1,4 +1,4 @@
-package colgen
+package schemagen
 
 import "gorm.io/gorm/schema"
 
@@ -26,7 +26,7 @@ func defaultConfig() config {
 //
 // Example:
 //
-//	g := colgen.New(colgen.WithOutputDir("./model"))
+//	g := schemagen.New(schemagen.WithOutputDir("./model"))
 //	_ = g
 func WithOutputDir(dir string) Option {
 	return func(c *config) {
@@ -38,7 +38,7 @@ func WithOutputDir(dir string) Option {
 //
 // Example:
 //
-//	g := colgen.New(colgen.WithPackageName("model"))
+//	g := schemagen.New(schemagen.WithPackageName("model"))
 //	_ = g
 func WithPackageName(name string) Option {
 	return func(c *config) {
@@ -51,7 +51,7 @@ func WithPackageName(name string) Option {
 // Example:
 //
 //	ns := schema.NamingStrategy{SingularTable: true}
-//	g := colgen.New(colgen.WithNamingStrategy(ns))
+//	g := schemagen.New(schemagen.WithNamingStrategy(ns))
 //	_ = g
 func WithNamingStrategy(ns schema.NamingStrategy) Option {
 	return func(c *config) {
@@ -63,7 +63,7 @@ func WithNamingStrategy(ns schema.NamingStrategy) Option {
 //
 // Example:
 //
-//	err := colgen.New(colgen.WithDryRun(true)).Generate(&model.User{})
+//	err := schemagen.New(schemagen.WithDryRun(true)).Generate(&model.User{})
 //	_ = err
 func WithDryRun(d bool) Option {
 	return func(c *config) {
@@ -75,7 +75,7 @@ func WithDryRun(d bool) Option {
 //
 // Example:
 //
-//	g := colgen.New(colgen.WithLogger(colgen.NewDefaultLogger()))
+//	g := schemagen.New(schemagen.WithLogger(schemagen.DefaultLogger()))
 //	_ = g
 func WithLogger(l Logger) Option {
 	return func(c *config) {

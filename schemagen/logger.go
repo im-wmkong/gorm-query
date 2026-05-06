@@ -1,11 +1,11 @@
-package colgen
+package schemagen
 
 import (
 	"log"
 	"os"
 )
 
-// Logger defines the logging interface used by the colgen generator.
+// Logger defines the logging interface used by the schemagen generator.
 type Logger interface {
 	// Debug logs debug-level messages.
 	Debug(format string, a ...any)
@@ -24,10 +24,10 @@ type defaultLogger struct {
 //
 // Example:
 //
-//	g := colgen.New(colgen.WithLogger(colgen.DefaultLogger()))
+//	g := schemagen.New(schemagen.WithLogger(schemagen.DefaultLogger()))
 //	_ = g
 func DefaultLogger() Logger {
-	return &defaultLogger{l: log.New(os.Stderr, "[colgen] ", log.LstdFlags)}
+	return &defaultLogger{l: log.New(os.Stderr, "[schemagen] ", log.LstdFlags)}
 }
 
 func (d *defaultLogger) Debug(format string, a ...any) { d.l.Printf("[DEBUG] "+format, a...) }
@@ -41,7 +41,7 @@ type nopLogger struct{}
 //
 // Example:
 //
-//	g := colgen.New(colgen.WithLogger(colgen.NopLogger()))
+//	g := schemagen.New(schemagen.WithLogger(schemagen.NopLogger()))
 //	_ = g
 func NopLogger() Logger                         { return nopLogger{} }
 func (nopLogger) Debug(format string, a ...any) { _ = format; _ = a }

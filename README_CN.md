@@ -27,12 +27,12 @@ GORM Query 的核心能力由以下 4 个模块构成，它们各司其职，又
 
 | 模块 | 核心职责 | 典型能力 / 方法 |
 | :--- | :--- | :--- |
-| **`colgen`** | **代码生成** | 解析 GORM 模型生成强类型 schema 定义（列 + 关联）。支持自定义输出目录、包名及 Dry-run 校验。 |
+| **`schemagen`** | **代码生成** | 解析 GORM 模型生成强类型 schema 定义（列 + 关联）。支持自定义输出目录、包名及 Dry-run 校验。 |
 | **`query`** | **动态查询构建** | **Builder**: `Where`, `Select`, `Joins`, `Preload`, `Page`, `Clone`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`, `String`... |
 | **`repo`** | **泛型仓储** | 提供通用 CRUD：`Create`, `Find`, `First`, `Update`, `Delete`, `Count`, `Pluck`... |
 | **`db`** | **上下文事务管理** | 提供 `db.Client`，支持通过 `context.Context` 无感传递事务连接，避免手动透传 DB。 |
 
-**最佳上手路径：** `colgen` 生成 schema 定义 ➔ 使用 `schema.Xxx` 构建 `query` ➔ 传入 `repo` 执行。
+**最佳上手路径：** `schemagen` 生成 schema 定义 ➔ 使用 `schema.Xxx` 构建 `query` ➔ 传入 `repo` 执行。
 
 ## 🚀 快速开始
 
@@ -65,12 +65,12 @@ import (
     "log"
 
     "your_project_name/model" // 替换为你的实际项目路径
-    "github.com/im-wmkong/gorm-query/colgen"
+    "github.com/im-wmkong/gorm-query/schemagen"
 )
 
 func main() {
     // 实例化生成器并传入模型
-    err := colgen.New().Generate(&model.User{})
+    err := schemagen.New().Generate(&model.User{})
 
     if err != nil {
         log.Fatalf("generate failed: %v", err)
@@ -85,7 +85,7 @@ go run cmd/gen/main.go
 ```
 *这会自动生成一个代码文件（例如 `model/schema/user_gen.go`），其中包含 `schema.User` 变量。*
 
-默认情况下，`colgen` 会把生成结果写入独立的 `schema` 包中。
+默认情况下，`schemagen` 会把生成结果写入独立的 `schema` 包中。
 
 > **💡 进阶提示：** 你也可以在任意 Go 文件的头部添加 `//go:generate go run cmd/gen/main.go`，之后就能通过在项目根目录运行 `go generate ./...` 将其无缝接入你的标准工作流。
 

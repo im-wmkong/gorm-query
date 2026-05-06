@@ -29,12 +29,12 @@ GORM Query consists of 4 core modules:
 
 | Module | Core Responsibility | Key Capabilities / Methods |
 | :--- | :--- | :--- |
-| **`colgen`** | **Code Generation** | Generates schema definitions like `schema.User` (columns + associations) from GORM models. Supports custom output, package names, and dry-run validation. |
+| **`schemagen`** | **Code Generation** | Generates schema definitions like `schema.User` (columns + associations) from GORM models. Supports custom output, package names, and dry-run validation. |
 | **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Joins`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`, `String`... |
 | **`repo`** | **Generic Repository** | Provides common CRUD methods: `Create`, `Save`, `Find`, `First`, `Update`, `Delete`, `Pluck`... |
 | **`db`** | **Context Transaction** | `db.Client` implements both `DBProvider` and `Transactor`. Repositories automatically reuse the same transaction via `ctx`. |
 
-**Best Path to Start:** `colgen` generation ➔ `schema.Xxx` definitions ➔ `query` builder ➔ `repo` execution.
+**Best Path to Start:** `schemagen` generation ➔ `schema.Xxx` definitions ➔ `query` builder ➔ `repo` execution.
 
 ## 🚀 Quick Start
 
@@ -67,12 +67,12 @@ import (
     "log"
 
     "your_project_name/model" // Replace with your actual project path
-    "github.com/im-wmkong/gorm-query/colgen"
+    "github.com/im-wmkong/gorm-query/schemagen"
 )
 
 func main() {
     // Initialize the generator and provide your models
-    err := colgen.New().Generate(&model.User{})
+    err := schemagen.New().Generate(&model.User{})
 
     if err != nil {
         log.Fatalf("generate failed: %v", err)
@@ -87,7 +87,7 @@ go run cmd/gen/main.go
 ```
 *This will automatically create a code file (e.g., `model/schema/user_gen.go`) containing the generated `schema.User` variable.*
 
-By default, `colgen` writes generated schema into a dedicated `schema` package.
+By default, `schemagen` writes generated schema into a dedicated `schema` package.
 
 > **💡 Pro Tip:** You can add `//go:generate go run cmd/gen/main.go` to the top of any Go file and trigger generation using `go generate ./...` in your standard workflow.
 
