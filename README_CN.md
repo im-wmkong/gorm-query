@@ -105,7 +105,7 @@ import (
 var db *gorm.DB
 
 // 1. 丝滑地构建查询条件
-qb := query.New().
+qb := query.New[model.User]().
     Where(
         schema.User.Age.Gte(18),
         schema.User.UserName.Contains("wmkong"),
@@ -194,7 +194,7 @@ func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User
 // ✅ 现代模式：极简的 Repository + 强大的 Builder
 func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name string, minAge int) ([]*model.User, error) {
     // 1. 使用 builder 自由组合查询条件
-    qb := query.New().Where(
+    qb := query.New[model.User]().Where(
         schema.User.Status.Eq(1), // 默认条件
     )
 
@@ -223,7 +223,7 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
 它可以防止底层切片共享带来的条件污染：
 
 ```go
-baseQuery := query.New().Where(schema.User.Status.Eq(1))
+baseQuery := query.New[model.User]().Where(schema.User.Status.Eq(1))
 
 // 派生查询 A
 adultsQuery := baseQuery.Clone().Where(schema.User.Age.Gte(18))

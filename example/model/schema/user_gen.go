@@ -2,27 +2,39 @@
 
 package schema
 
-import query "github.com/im-wmkong/gorm-query/query"
+import (
+	model "github.com/im-wmkong/gorm-query/example/model"
+	query "github.com/im-wmkong/gorm-query/query"
+	gorm "gorm.io/gorm"
+)
+
+// user describes the schema metadata for the User model.
+type user struct {
+	ID        query.NumericColumn[uint]
+	CreatedAt query.TimeColumn
+	UpdatedAt query.TimeColumn
+	DeletedAt query.ValueColumn[gorm.DeletedAt]
+	UserName  query.StringColumn[string]
+	Email     query.StringColumn[string]
+	Age       query.NumericColumn[int]
+	Status    query.NumericColumn[int]
+	Profile   query.Association[model.User, model.Profile]
+}
 
 // User provides query columns and associations for the User model.
-var User = struct {
-	ID        query.Column
-	CreatedAt query.Column
-	UpdatedAt query.Column
-	DeletedAt query.Column
-	UserName  query.Column
-	Email     query.Column
-	Age       query.Column
-	Status    query.Column
-	Profile   query.Association
-}{
-	ID:        "id",
-	CreatedAt: "created_at",
-	UpdatedAt: "updated_at",
-	DeletedAt: "deleted_at",
-	UserName:  "user_name",
-	Email:     "email",
-	Age:       "age",
-	Status:    "status",
-	Profile:   "Profile",
+var User = user{
+	ID:        query.NewNumericColumn[uint]("users", "id"),
+	CreatedAt: query.NewTimeColumn("users", "created_at"),
+	UpdatedAt: query.NewTimeColumn("users", "updated_at"),
+	DeletedAt: query.NewValueColumn[gorm.DeletedAt]("users", "deleted_at"),
+	UserName:  query.NewStringColumn[string]("users", "user_name"),
+	Email:     query.NewStringColumn[string]("users", "email"),
+	Age:       query.NewNumericColumn[int]("users", "age"),
+	Status:    query.NewNumericColumn[int]("users", "status"),
+	Profile:   query.NewAssociation[model.User, model.Profile]("Profile"),
+}
+
+// Query returns a new query builder bound to the User model.
+func (s *user) Query() *query.Builder[model.User] {
+	return query.New[model.User]()
 }

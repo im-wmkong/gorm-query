@@ -6,6 +6,16 @@ import (
 	"strings"
 )
 
+// UnwrapPtr returns the underlying type by repeatedly stripping pointer
+// indirection. It returns t unchanged if it is not a pointer, and nil if t
+// is nil.
+func UnwrapPtr(t reflect.Type) reflect.Type {
+	for t != nil && t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t
+}
+
 // PackageName returns the last segment of the package path of model's type.
 //
 // It returns ok=false when:

@@ -2,21 +2,33 @@
 
 package schema
 
-import query "github.com/im-wmkong/gorm-query/query"
+import (
+	model "github.com/im-wmkong/gorm-query/example/model"
+	query "github.com/im-wmkong/gorm-query/query"
+	gorm "gorm.io/gorm"
+)
+
+// profile describes the schema metadata for the Profile model.
+type profile struct {
+	ID        query.NumericColumn[uint]
+	CreatedAt query.TimeColumn
+	UpdatedAt query.TimeColumn
+	DeletedAt query.ValueColumn[gorm.DeletedAt]
+	UserID    query.NumericColumn[uint]
+	Bio       query.StringColumn[string]
+}
 
 // Profile provides query columns and associations for the Profile model.
-var Profile = struct {
-	ID        query.Column
-	CreatedAt query.Column
-	UpdatedAt query.Column
-	DeletedAt query.Column
-	UserID    query.Column
-	Bio       query.Column
-}{
-	ID:        "id",
-	CreatedAt: "created_at",
-	UpdatedAt: "updated_at",
-	DeletedAt: "deleted_at",
-	UserID:    "user_id",
-	Bio:       "bio",
+var Profile = profile{
+	ID:        query.NewNumericColumn[uint]("profiles", "id"),
+	CreatedAt: query.NewTimeColumn("profiles", "created_at"),
+	UpdatedAt: query.NewTimeColumn("profiles", "updated_at"),
+	DeletedAt: query.NewValueColumn[gorm.DeletedAt]("profiles", "deleted_at"),
+	UserID:    query.NewNumericColumn[uint]("profiles", "user_id"),
+	Bio:       query.NewStringColumn[string]("profiles", "bio"),
+}
+
+// Query returns a new query builder bound to the Profile model.
+func (s *profile) Query() *query.Builder[model.Profile] {
+	return query.New[model.Profile]()
 }

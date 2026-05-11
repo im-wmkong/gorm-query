@@ -22,23 +22,23 @@ type user struct {
 }
 
 var userSchema = struct {
-	ID        Column
-	CreatedAt Column
-	UpdatedAt Column
-	DeletedAt Column
-	UserName  Column
-	Email     Column
-	Age       Column
-	Status    Column
+	ID        NumericColumn[uint]
+	CreatedAt TimeColumn
+	UpdatedAt TimeColumn
+	DeletedAt ValueColumn[gorm.DeletedAt]
+	UserName  StringColumn[string]
+	Email     StringColumn[string]
+	Age       NumericColumn[int]
+	Status    NumericColumn[int]
 }{
-	ID:        "id",
-	CreatedAt: "created_at",
-	UpdatedAt: "updated_at",
-	DeletedAt: "deleted_at",
-	UserName:  "user_name",
-	Email:     "email",
-	Age:       "age",
-	Status:    "status",
+	ID:        NewNumericColumn[uint]("", "id"),
+	CreatedAt: NewTimeColumn("", "created_at"),
+	UpdatedAt: NewTimeColumn("", "updated_at"),
+	DeletedAt: NewValueColumn[gorm.DeletedAt]("", "deleted_at"),
+	UserName:  NewStringColumn[string]("", "user_name"),
+	Email:     NewStringColumn[string]("", "email"),
+	Age:       NewNumericColumn[int]("", "age"),
+	Status:    NewNumericColumn[int]("", "status"),
 }
 
 func openTestDB(t *testing.T) *gorm.DB {
@@ -71,7 +71,7 @@ func seedUsers(t *testing.T, db *gorm.DB) {
 	}
 }
 
-func applyFind(t *testing.T, db *gorm.DB, qb *Builder) ([]user, error) {
+func applyFind(t *testing.T, db *gorm.DB, qb *Builder[user]) ([]user, error) {
 	t.Helper()
 	var out []user
 	q := db.Model(&user{})
@@ -82,7 +82,7 @@ func applyFind(t *testing.T, db *gorm.DB, qb *Builder) ([]user, error) {
 	return out, err
 }
 
-func applyFirst(t *testing.T, db *gorm.DB, qb *Builder) (*user, error) {
+func applyFirst(t *testing.T, db *gorm.DB, qb *Builder[user]) (*user, error) {
 	t.Helper()
 	var out user
 	q := db.Model(&user{})
@@ -96,7 +96,7 @@ func applyFirst(t *testing.T, db *gorm.DB, qb *Builder) (*user, error) {
 	return &out, nil
 }
 
-func applyDelete(t *testing.T, db *gorm.DB, qb *Builder) (int64, error) {
+func applyDelete(t *testing.T, db *gorm.DB, qb *Builder[user]) (int64, error) {
 	t.Helper()
 	q := db.Model(&user{})
 	if qb != nil {
@@ -110,7 +110,7 @@ func TestTypeSafeColumnUsage(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	q := New().Where(userSchema.Email.Eq("alice@example.com"))
+	q := New[user]().Where(userSchema.Email.Eq("alice@example.com"))
 	alice, err := applyFirst(t, db, q)
 	require.NoError(t, err)
 	require.NotNil(t, alice)
@@ -121,7 +121,7 @@ func TestPagination_Page(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	q := New().Order(userSchema.CreatedAt.Desc()).Page(1, 2)
+	q := New[user]().Order(userSchema.CreatedAt.Desc()).Page(1, 2)
 	users, err := applyFind(t, db, q)
 	require.NoError(t, err)
 	require.Len(t, users, 2)
@@ -133,23 +133,23 @@ func TestQuery_StringHelpers(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.UserName.HasPrefix("Al")))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.UserName.HasPrefix("Al")))
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "Alice", users[0].UserName)
 
-	users, err = applyFind(t, db, New().Where(userSchema.UserName.HasSuffix("lie")))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.UserName.HasSuffix("lie")))
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "Charlie", users[0].UserName)
 
-	users, err = applyFind(t, db, New().Where(userSchema.UserName.Contains("li")))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.UserName.Contains("li")))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 	assert.Equal(t, "Alice", users[0].UserName)
 	assert.Equal(t, "Charlie", users[1].UserName)
 
-	users, err = applyFind(t, db, New().Where(userSchema.UserName.NotContains("a")))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.UserName.NotContains("a")))
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "Bob", users[0].UserName)
@@ -159,7 +159,7 @@ func TestQuery_NotLike(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.UserName.NotLike("%a%")))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.UserName.NotLike("%a%")))
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "Bob", users[0].UserName)
@@ -169,14 +169,14 @@ func TestQuery_Select_Omit(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	qSelect := New().Select(userSchema.UserName).Where(userSchema.UserName.Eq("Bob"))
+	qSelect := New[user]().Select(userSchema.UserName).Where(userSchema.UserName.Eq("Bob"))
 	u, err := applyFirst(t, db, qSelect)
 	require.NoError(t, err)
 	require.NotNil(t, u)
 	assert.Equal(t, "Bob", u.UserName)
 	assert.Empty(t, u.Email)
 
-	qOmit := New().Omit(userSchema.Email).Where(userSchema.UserName.Eq("Bob"))
+	qOmit := New[user]().Omit(userSchema.Email).Where(userSchema.UserName.Eq("Bob"))
 	u, err = applyFirst(t, db, qOmit)
 	require.NoError(t, err)
 	require.NotNil(t, u)
@@ -188,66 +188,42 @@ func TestQuery_Distinct(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	q := New().Distinct(userSchema.UserName).Select(userSchema.UserName).Order(userSchema.UserName)
+	q := New[user]().Distinct(userSchema.UserName).Select(userSchema.UserName).Order(userSchema.UserName)
 	users, err := applyFind(t, db, q)
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 	assert.Equal(t, "Alice", users[0].UserName)
 }
 
-func TestQuery_Between_AndColumnComparison(t *testing.T) {
+func TestQuery_Between(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.Age.Between(20, 30)))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.Age.Between(20, 30)))
 	require.NoError(t, err)
 	require.Len(t, users, 3)
-
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Between(userSchema.Age, userSchema.Age)))
-	require.NoError(t, err)
-	require.Len(t, users, 5)
-
-	users, err = applyFind(t, db, New().Where(userSchema.UserName.Like(userSchema.UserName)))
-	require.NoError(t, err)
-	require.Len(t, users, 5)
 }
 
 func TestQuery_ComparisonOps(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.Age.Gt(30)))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.Age.Gt(30)))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Gte(30)))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.Age.Gte(30)))
 	require.NoError(t, err)
 	require.Len(t, users, 3)
 
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Lt(25)))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.Age.Lt(25)))
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "David", users[0].UserName)
 
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Lte(25)))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.Age.Lte(25)))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
-
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Lt(userSchema.Age)))
-	require.NoError(t, err)
-	require.Empty(t, users)
-
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Lte(userSchema.Age)))
-	require.NoError(t, err)
-	require.Len(t, users, 5)
-
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Gt(userSchema.Age)))
-	require.NoError(t, err)
-	require.Empty(t, users)
-
-	users, err = applyFind(t, db, New().Where(userSchema.Age.Gte(userSchema.Age)))
-	require.NoError(t, err)
-	require.Len(t, users, 5)
 }
 
 func TestQuery_In_NotIn(t *testing.T) {
@@ -255,11 +231,11 @@ func TestQuery_In_NotIn(t *testing.T) {
 	seedUsers(t, db)
 
 	names := []string{"Alice", "Bob"}
-	users, err := applyFind(t, db, New().Where(userSchema.UserName.In(names)))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.UserName.In(names)))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 
-	users, err = applyFind(t, db, New().Where(userSchema.UserName.NotIn(names)))
+	users, err = applyFind(t, db, New[user]().Where(userSchema.UserName.NotIn(names)))
 	require.NoError(t, err)
 	require.Len(t, users, 3)
 }
@@ -268,16 +244,16 @@ func TestQuery_Null_NotNull_WithSoftDelete(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.DeletedAt.IsNull()))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.DeletedAt.IsNull()))
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 
-	alice, err := applyFirst(t, db, New().Where(userSchema.UserName.Eq("Alice")))
+	alice, err := applyFirst(t, db, New[user]().Where(userSchema.UserName.Eq("Alice")))
 	require.NoError(t, err)
-	_, err = applyDelete(t, db, New().Where(userSchema.ID.Eq(alice.ID)))
+	_, err = applyDelete(t, db, New[user]().Where(userSchema.ID.Eq(alice.ID)))
 	require.NoError(t, err)
 
-	users, err = applyFind(t, db, New().Unscoped().Where(userSchema.DeletedAt.IsNotNull()))
+	users, err = applyFind(t, db, New[user]().Unscoped().Where(userSchema.DeletedAt.IsNotNull()))
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, "Alice", users[0].UserName)
@@ -287,12 +263,12 @@ func TestQuery_Or_Not_Clone_EmptyNested(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	qOr := New().Where(userSchema.UserName.Eq("Alice")).Or(userSchema.UserName.Eq("Bob"))
+	qOr := New[user]().Where(userSchema.UserName.Eq("Alice")).Or(userSchema.UserName.Eq("Bob"))
 	users, err := applyFind(t, db, qOr)
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 
-	base := New().Where(userSchema.Status.Eq(1))
+	base := New[user]().Where(userSchema.Status.Eq(1))
 	derived := base.Clone().Where(userSchema.UserName.Eq("Alice"))
 	users, err = applyFind(t, db, base)
 	require.NoError(t, err)
@@ -302,12 +278,12 @@ func TestQuery_Or_Not_Clone_EmptyNested(t *testing.T) {
 	require.Len(t, users, 1)
 	assert.Equal(t, "Alice", users[0].UserName)
 
-	qEmpty := New().Where(userSchema.Status.Eq(1)).Or().Not()
+	qEmpty := New[user]().Where(userSchema.Status.Eq(1)).Or().Not()
 	users, err = applyFind(t, db, qEmpty)
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 
-	qNot := New().Not(userSchema.UserName.Eq("Alice"))
+	qNot := New[user]().Not(userSchema.UserName.Eq("Alice"))
 	users, err = applyFind(t, db, qNot)
 	require.NoError(t, err)
 	require.Len(t, users, 4)
@@ -319,64 +295,53 @@ func TestQuery_Group_Having(t *testing.T) {
 
 	require.NoError(t, db.Create(&user{UserName: "Frank", Email: "frank@example.com", Age: 25, Status: 1}).Error)
 
-	qGroup := New().Select(userSchema.Age).Group(userSchema.Age).Having("count(*) > ?", 1)
+	qGroup := New[user]().Select(userSchema.Age).Group(userSchema.Age).Having("count(*) > ?", 1)
 	users, err := applyFind(t, db, qGroup)
 	require.NoError(t, err)
 	require.Len(t, users, 1)
 	assert.Equal(t, 25, users[0].Age)
 }
 
-func TestQuery_Preload_NoRelationShouldError(t *testing.T) {
-	db := openTestDB(t)
-	seedUsers(t, db)
-
-	q := New().Preload(Association("Orders"))
-	_, err := applyFind(t, db, q)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Orders")
-}
-
 func TestQuery_Limit_Offset_Unscoped_Order_Joins_Scope(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Limit(2).Order(userSchema.ID))
+	users, err := applyFind(t, db, New[user]().Limit(2).Order(userSchema.ID))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 	assert.Equal(t, "Alice", users[0].UserName)
 	assert.Equal(t, "Bob", users[1].UserName)
 
-	users, err = applyFind(t, db, New().Limit(2).Offset(2).Order(userSchema.ID))
+	users, err = applyFind(t, db, New[user]().Limit(2).Offset(2).Order(userSchema.ID))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 	assert.Equal(t, "Charlie", users[0].UserName)
 	assert.Equal(t, "David", users[1].UserName)
 
-	users, err = applyFind(t, db, New().Page(0, 0))
+	users, err = applyFind(t, db, New[user]().Page(0, 0))
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 
 	activeScope := func(db *gorm.DB) *gorm.DB { return db.Where("status = ?", 1) }
-	users, err = applyFind(t, db, New().Scope(activeScope))
+	users, err = applyFind(t, db, New[user]().Scope(activeScope))
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 
-	// order variants
-	users, err = applyFind(t, db, New().Order(Column("id DESC")))
+	users, err = applyFind(t, db, New[user]().Order(RawFragment("id DESC")))
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 	assert.Equal(t, "admin", users[0].UserName)
 
-	users, err = applyFind(t, db, New().Order(userSchema.ID))
+	users, err = applyFind(t, db, New[user]().Order(userSchema.ID))
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", users[0].UserName)
 
-	users, err = applyFind(t, db, New().Order(userSchema.ID.Desc()))
+	users, err = applyFind(t, db, New[user]().Order(userSchema.ID.Desc()))
 	require.NoError(t, err)
 	assert.Equal(t, "admin", users[0].UserName)
 
 	// joins
-	qJoin := New().Joins("JOIN users as u2 ON users.id = u2.id").Where(func(db *gorm.DB) *gorm.DB {
+	qJoin := New[user]().Joins("JOIN users as u2 ON users.id = u2.id").Where(func(db *gorm.DB) *gorm.DB {
 		return db.Where("u2.user_name = ?", "Alice")
 	})
 	users, err = applyFind(t, db, qJoin)
@@ -389,24 +354,24 @@ func TestColumn_Helpers_AndNeq(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.UserName.Neq("Alice")))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.UserName.Neq("Alice")))
 	require.NoError(t, err)
 	require.Len(t, users, 4)
 
-	assert.Equal(t, Column("users.age"), userSchema.Age.Table("users"))
-	assert.Equal(t, Column("DISTINCT age"), userSchema.Age.Distinct())
-	assert.Equal(t, Column("SUM(age)"), userSchema.Age.Sum())
-	assert.Equal(t, Column("COUNT(age)"), userSchema.Age.Count())
-	assert.Equal(t, Column("AVG(age)"), userSchema.Age.Avg())
-	assert.Equal(t, Column("MIN(age)"), userSchema.Age.Min())
+	// Qualified / aliased / aggregate SQL fragments.
+	assert.Equal(t, "users.age", userSchema.Age.WithTable("users").SQL())
+	assert.Equal(t, "DISTINCT age", userSchema.Age.Distinct().SQL())
+	assert.Equal(t, "SUM(age)", userSchema.Age.Sum().SQL())
+	assert.Equal(t, "COUNT(age)", userSchema.Age.Count().SQL())
+	assert.Equal(t, "AVG(age)", userSchema.Age.Avg().SQL())
+	assert.Equal(t, "MIN(age)", userSchema.Age.Min().SQL())
 }
 
 func TestQuery_NotBetween(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	// NOT BETWEEN 20 AND 30 -> Charlie(35), admin(40)
-	users, err := applyFind(t, db, New().Where(userSchema.Age.NotBetween(20, 30)))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.Age.NotBetween(20, 30)))
 	require.NoError(t, err)
 	require.Len(t, users, 2)
 	for _, u := range users {
@@ -420,13 +385,13 @@ func TestQuery_OrderHelpers_AscDesc(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Order(userSchema.Age.Asc()))
+	users, err := applyFind(t, db, New[user]().Order(userSchema.Age.Asc()))
 	require.NoError(t, err)
 	require.NotEmpty(t, users)
 	assert.Equal(t, 20, users[0].Age)
 	assert.Equal(t, 40, users[len(users)-1].Age)
 
-	users, err = applyFind(t, db, New().Order(userSchema.Age.Desc()))
+	users, err = applyFind(t, db, New[user]().Order(userSchema.Age.Desc()))
 	require.NoError(t, err)
 	require.NotEmpty(t, users)
 	assert.Equal(t, 40, users[0].Age)
@@ -437,16 +402,14 @@ func TestQuery_SelectHelpers_AsAndAgg(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	// Email.As("user_name"): map the email column to the UserName field.
-	qAs := New().Select(userSchema.Email.As("user_name")).Where(userSchema.UserName.Eq("Alice"))
+	qAs := New[user]().Select(userSchema.Email.As("user_name")).Where(userSchema.UserName.Eq("Alice"))
 	u, err := applyFirst(t, db, qAs)
 	require.NoError(t, err)
 	require.NotNil(t, u)
 	assert.Equal(t, "alice@example.com", u.UserName)
 
-	// Max(Age)
 	qMax := db.Model(&user{})
-	qMax = New().Select(userSchema.Age.Max().As("age")).Apply(qMax)
+	qMax = New[user]().Select(userSchema.Age.Max().As("age")).Apply(qMax)
 	var out user
 	require.NoError(t, qMax.Scan(&out).Error)
 	assert.Equal(t, 40, out.Age)
@@ -456,16 +419,30 @@ func TestQuery_InEmptyDoesNotError(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
-	users, err := applyFind(t, db, New().Where(userSchema.UserName.In([]string{})))
+	users, err := applyFind(t, db, New[user]().Where(userSchema.UserName.In([]string{})))
 	require.NoError(t, err)
 	assert.Empty(t, users)
 }
 
+// --- Association / Preload ---
+
+type addr struct{}
+
+type profile struct{}
+
 func TestAssociation_Nested(t *testing.T) {
-	assert.Equal(t, Association("Profile.Address"), Association("Profile").Nested(Association("Address")))
-	assert.Equal(t, Association("Address"), Association("").Nested(Association("Address")))
-	assert.Equal(t, Association("Profile"), Association("Profile").Nested(Association("")))
-	assert.Equal(t, Association(""), Association("").Nested(Association("")))
+	userProfile := NewAssociation[user, profile]("Profile")
+	profileAddr := NewAssociation[profile, addr]("Address")
+
+	// user.Profile.Nested(profile.Address)  -> "Profile.Address"
+	nested := userProfile.Nested(profileAddr)
+	assert.Equal(t, "Profile.Address", nested.Path())
+
+	// Empty parent or sub preserves the non-empty side.
+	emptyParent := NewAssociation[user, profile]("")
+	assert.Equal(t, "Address", emptyParent.Nested(profileAddr).Path())
+	emptySub := NewAssociation[profile, addr]("")
+	assert.Equal(t, "Profile", userProfile.Nested(emptySub).Path())
 }
 
 type preloadUser struct {
@@ -508,8 +485,11 @@ func TestQuery_Preload_WithConds(t *testing.T) {
 		{PreloadUserID: u2.ID, Status: 2},
 	}).Error)
 
-	qb := New().Preload(Association("Orders"),
-		func(tx *gorm.DB) *gorm.DB { return tx.Where("status = ?", 1) },
+	orders := NewAssociation[preloadUser, preloadOrder]("Orders")
+	status := NewNumericColumn[int]("", "status")
+
+	qb := New[preloadUser]().Preload(orders,
+		status.Eq(1),
 		func(tx *gorm.DB) *gorm.DB { return tx.Order("id asc") },
 	)
 
@@ -524,4 +504,118 @@ func TestQuery_Preload_WithConds(t *testing.T) {
 
 	assert.Equal(t, "U2", out[1].Name)
 	assert.Empty(t, out[1].Orders)
+}
+
+func TestQuery_Preload_WithoutConds(t *testing.T) {
+	db := openPreloadTestDB(t)
+
+	u := &preloadUser{Name: "U"}
+	require.NoError(t, db.Create(u).Error)
+	require.NoError(t, db.Create([]*preloadOrder{
+		{PreloadUserID: u.ID, Status: 1},
+		{PreloadUserID: u.ID, Status: 2},
+	}).Error)
+
+	orders := NewAssociation[preloadUser, preloadOrder]("Orders")
+	qb := New[preloadUser]().Preload(orders)
+
+	var out []preloadUser
+	err := qb.Apply(db.Model(&preloadUser{})).Find(&out).Error
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	assert.Len(t, out[0].Orders, 2)
+}
+
+func TestQuery_Select_Empty(t *testing.T) {
+	db := openTestDB(t)
+	seedUsers(t, db)
+
+	// No columns: Select must return the receiver unchanged.
+	qb := New[user]()
+	assert.Same(t, qb, qb.Select())
+
+	// And the resulting query still loads every row + every column.
+	users, err := applyFind(t, db, qb)
+	require.NoError(t, err)
+	require.Len(t, users, 5)
+}
+
+func TestColumn_NameAndTable(t *testing.T) {
+	bare := NewStringColumn[string]("", "user_name")
+	assert.Equal(t, "user_name", bare.Name())
+	assert.Equal(t, "", bare.Table())
+	assert.Equal(t, "user_name", bare.SQL())
+
+	qual := NewStringColumn[string]("users", "user_name")
+	assert.Equal(t, "user_name", qual.Name())
+	assert.Equal(t, "users", qual.Table())
+	assert.Equal(t, "users.user_name", qual.SQL())
+}
+
+func TestStringColumn_LikeAndSet(t *testing.T) {
+	db := openTestDB(t)
+	seedUsers(t, db)
+
+	users, err := applyFind(t, db, New[user]().Where(userSchema.UserName.Like("%li%")))
+	require.NoError(t, err)
+	require.Len(t, users, 2)
+
+	// Set produces an Assignment whose Column matches the bare name.
+	a := userSchema.UserName.Set("renamed")
+	assert.Equal(t, "user_name", a.Column)
+	assert.Equal(t, "renamed", a.Value)
+}
+
+func TestBoolColumn_Helpers(t *testing.T) {
+	type boolRow struct {
+		ID     uint
+		Active bool
+	}
+
+	name := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
+	dsn := fmt.Sprintf("file:query_bool_%s?mode=memory&cache=shared", name)
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&boolRow{}))
+	require.NoError(t, db.Create([]*boolRow{
+		{Active: true}, {Active: true}, {Active: false},
+	}).Error)
+
+	active := NewBoolColumn("", "active")
+
+	var trues []boolRow
+	require.NoError(t, active.IsTrue()(db.Model(&boolRow{})).Find(&trues).Error)
+	assert.Len(t, trues, 2)
+
+	var falses []boolRow
+	require.NoError(t, active.IsFalse()(db.Model(&boolRow{})).Find(&falses).Error)
+	assert.Len(t, falses, 1)
+}
+
+func TestAssignments_ToMap(t *testing.T) {
+	t.Run("empty returns nil", func(t *testing.T) {
+		assert.Nil(t, Assignments(nil).ToMap())
+		assert.Nil(t, Assignments{}.ToMap())
+	})
+
+	t.Run("later assignment wins for the same column", func(t *testing.T) {
+		got := Assignments{
+			userSchema.UserName.Set("first"),
+			userSchema.Age.Set(10),
+			userSchema.UserName.Set("second"),
+		}.ToMap()
+		assert.Equal(t, map[string]any{
+			"user_name": "second",
+			"age":       10,
+		}, got)
+	})
+}
+
+// TestAssociation_ParentMatching confirms that Association satisfies the
+// nestable interface via its parentOf marker; this also exercises the marker
+// so coverage tracks it.
+func TestAssociation_ParentMatching(t *testing.T) {
+	a := NewAssociation[preloadUser, preloadOrder]("Orders")
+	var n nestable[preloadUser] = a
+	assert.Equal(t, "Orders", n.Path())
 }

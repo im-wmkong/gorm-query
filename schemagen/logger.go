@@ -43,7 +43,7 @@ type nopLogger struct{}
 //
 //	g := schemagen.New(schemagen.WithLogger(schemagen.NopLogger()))
 //	_ = g
-func NopLogger() Logger                         { return nopLogger{} }
-func (nopLogger) Debug(format string, a ...any) { _ = format; _ = a }
-func (nopLogger) Info(format string, a ...any)  { _ = format; _ = a }
-func (nopLogger) Warn(format string, a ...any)  { _ = format; _ = a }
+func NopLogger() Logger                { return nopLogger{} }
+func (nopLogger) Debug(string, ...any) {}
+func (nopLogger) Info(string, ...any)  {}
+func (nopLogger) Warn(string, ...any)  {}

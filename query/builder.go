@@ -7,7 +7,7 @@
 package query
 
 import (
-	"github.com/im-wmkong/gorm-query/internal/column"
+	"github.com/im-wmkong/gorm-query/internal/fragment"
 	"github.com/im-wmkong/gorm-query/internal/gormx"
 	"gorm.io/gorm"
 )
@@ -16,41 +16,39 @@ import (
 // All WHERE-like conditions are eventually represented as a Condition.
 type Condition func(db *gorm.DB) *gorm.DB
 
-// Builder accumulates query conditions.
-// Builder is NOT concurrency-safe; do not use the same instance in multiple goroutines.
-// If you need to reuse conditions concurrently, call Clone to get an independent copy.
+// Builder accumulates query conditions for a specific entity type T.
+// Builder is NOT concurrency-safe; do not use the same instance in multiple
+// goroutines. If you need to reuse conditions concurrently, call Clone to get
+// an independent copy.
+//
+// The type parameter T ties Preload to associations whose Parent is T, so that
+// schema.Order.Items cannot be preloaded through a Builder[User].
 //
 // Example:
 //
-//	// Build conditions with generated columns, then apply to *gorm.DB.
-//	qb := query.New().Where(
+//	qb := query.New[User]().Where(
 //	    schema.User.Status.Eq(1),
 //	    schema.User.Age.Gte(18),
 //	).Order(schema.User.CreatedAt.Desc()).Page(1, 20)
 //
 //	session := qb.Apply(db.Model(&User{}))
 //	_ = session
-type Builder struct {
+type Builder[T any] struct {
 	conditions []Condition
 }
 
-// New creates a new query builder.
+// New creates a new query builder bound to entity type T.
 //
 // Example:
 //
-//	qb := query.New()
+//	qb := query.New[User]()
 //	_ = qb
-func New() *Builder {
-	return &Builder{}
+func New[T any]() *Builder[T] {
+	return &Builder[T]{}
 }
 
 // Apply applies all accumulated conditions to the given gorm.DB session.
-//
-// Example:
-//
-//	session := query.New().Where(schema.User.Age.Gt(18)).Apply(db.Model(&User{}))
-//	_ = session
-func (b *Builder) Apply(db *gorm.DB) *gorm.DB {
+func (b *Builder[T]) Apply(db *gorm.DB) *gorm.DB {
 	for _, cond := range b.conditions {
 		db = cond(db)
 	}
@@ -58,122 +56,86 @@ func (b *Builder) Apply(db *gorm.DB) *gorm.DB {
 }
 
 // Clone makes a deep copy of the builder so common conditions can be reused safely.
-//
-// Example:
-//
-//	base := query.New().Where(schema.User.Status.Eq(1))
-//	q1 := base.Clone().Where(schema.User.Age.Gte(18))
-//	q2 := base.Clone().Where(schema.User.Age.Lt(18))
-//	_, _ = q1, q2
-func (b *Builder) Clone() *Builder {
+func (b *Builder[T]) Clone() *Builder[T] {
 	conditions := make([]Condition, len(b.conditions))
 	copy(conditions, b.conditions)
-	return &Builder{conditions: conditions}
+	return &Builder[T]{conditions: conditions}
 }
 
 // Where appends one or more conditions.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Email.Like("%example.com%"))
-//	_ = qb
-func (b *Builder) Where(conds ...Condition) *Builder {
+func (b *Builder[T]) Where(conds ...Condition) *Builder[T] {
 	return b.bind(conds...)
 }
 
 // Or appends nested OR conditions.
-//
-// Example:
-//
-//	// WHERE (status = 1) OR (status = 2)
-//	qb := query.New().Or(schema.User.Status.Eq(1), schema.User.Status.Eq(2))
-//	_ = qb
-func (b *Builder) Or(conds ...Condition) *Builder {
+func (b *Builder[T]) Or(conds ...Condition) *Builder[T] {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
 		return db.Or(nested)
 	})
 }
 
 // Not appends nested NOT conditions.
-//
-// Example:
-//
-//	// WHERE NOT (status = 0)
-//	qb := query.New().Not(schema.User.Status.Eq(0))
-//	_ = qb
-func (b *Builder) Not(conds ...Condition) *Builder {
+func (b *Builder[T]) Not(conds ...Condition) *Builder[T] {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
 		return db.Not(nested)
 	})
 }
 
-// Select sets the SELECT clause.
-//
-// Example:
-//
-//	// SELECT user_name, email
-//	qb := query.New().Select(schema.User.UserName, schema.User.Email)
-//	_ = qb
-func (b *Builder) Select(expr any, args ...any) *Builder {
+// Select sets the SELECT clause. Accepts any mixture of typed columns and
+// SQL fragments (Distinct, As, aggregates) because they all satisfy SQLFragment.
+func (b *Builder[T]) Select(cols ...SQLFragment) *Builder[T] {
+	if len(cols) == 0 {
+		return b
+	}
+	head := cols[0].SQL()
+	rest := fragment.RenderAllAny(cols[1:])
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Select(column.Value(expr), column.Values(args)...)
+		return db.Select(head, rest...)
 	})
 }
 
 // Omit omits columns.
-//
-// Example:
-//
-//	qb := query.New().Omit(schema.User.UpdatedAt, schema.User.DeletedAt)
-//	_ = qb
-func (b *Builder) Omit(cols ...Column) *Builder {
+func (b *Builder[T]) Omit(cols ...SQLFragment) *Builder[T] {
+	names := fragment.RenderAll(cols)
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Omit(column.ValuesTo[string](cols)...)
+		return db.Omit(names...)
 	})
 }
 
 // Distinct adds DISTINCT to the query.
-//
-// Example:
-//
-//	// SELECT DISTINCT email
-//	qb := query.New().Distinct(schema.User.Email)
-//	_ = qb
-func (b *Builder) Distinct(cols ...Column) *Builder {
+func (b *Builder[T]) Distinct(cols ...SQLFragment) *Builder[T] {
+	args := fragment.RenderAllAny(cols)
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Distinct(column.Values(cols)...)
+		return db.Distinct(args...)
 	})
 }
 
 // Joins adds a raw JOIN clause. args are bound to ? placeholders in sql.
-//
-// Example:
-//
-//	qb := query.New().Joins("JOIN profiles ON profiles.user_id = users.id")
-//	_ = qb
-func (b *Builder) Joins(sql string, args ...any) *Builder {
+func (b *Builder[T]) Joins(sql string, args ...any) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Joins(sql, args...)
 	})
 }
 
-// Preload preloads an association. Extra conditions (if provided) are applied
-// to the preload query as a nested scope.
+// Preload preloads an association. The association's Parent must be T; the
+// compiler rejects Preload(schema.Order.Items) on a Builder[User].
+// Extra conditions (if provided) are applied to the preload query as a nested scope.
 //
 // Example:
 //
-//	// Simple preload
-//	qb := query.New().Preload(schema.User.Profile)
-//
-//	// Preload with conditions on the associated rows
-//	qb = query.New().Preload(schema.User.Orders, schema.Order.Status.Eq(1))
+//	qb := query.New[User]().Preload(schema.User.Profile)
+//	qb = query.New[User]().Preload(
+//	    schema.User.Profile.Nested(schema.Profile.Address),
+//	    schema.Address.City.Eq("SF"),
+//	)
 //	_ = qb
-func (b *Builder) Preload(assoc Association, conds ...Condition) *Builder {
+func (b *Builder[T]) Preload(assoc nestable[T], conds ...Condition) *Builder[T] {
+	path := assoc.Path()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		if len(conds) == 0 {
-			return db.Preload(assoc.String())
+			return db.Preload(path)
 		}
-		return db.Preload(assoc.String(), func(tx *gorm.DB) *gorm.DB {
+		return db.Preload(path, func(tx *gorm.DB) *gorm.DB {
 			for _, cond := range conds {
 				tx = cond(tx)
 			}
@@ -183,48 +145,30 @@ func (b *Builder) Preload(assoc Association, conds ...Condition) *Builder {
 }
 
 // Group adds GROUP BY.
-//
-// Example:
-//
-//	qb := query.New().Group(schema.User.Status)
-//	_ = qb
-func (b *Builder) Group(col Column) *Builder {
+func (b *Builder[T]) Group(col SQLFragment) *Builder[T] {
+	expr := col.SQL()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Group(col.String())
+		return db.Group(expr)
 	})
 }
 
 // Having adds HAVING. args are bound to ? placeholders in expr.
-//
-// Example:
-//
-//	qb := query.New().Group(schema.User.Status).Having("COUNT(*) > ?", 10)
-//	_ = qb
-func (b *Builder) Having(expr string, args ...any) *Builder {
+func (b *Builder[T]) Having(expr string, args ...any) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Having(expr, args...)
 	})
 }
 
 // Order adds ORDER BY.
-//
-// Example:
-//
-//	qb := query.New().Order(schema.User.CreatedAt.Desc())
-//	_ = qb
-func (b *Builder) Order(col Column) *Builder {
+func (b *Builder[T]) Order(col SQLFragment) *Builder[T] {
+	expr := col.SQL()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Order(col.String())
+		return db.Order(expr)
 	})
 }
 
 // Page applies pagination (page starts from 1; pageSize defaults to 10).
-//
-// Example:
-//
-//	qb := query.New().Page(2, 50) // page 2, 50 items per page
-//	_ = qb
-func (b *Builder) Page(page, pageSize int) *Builder {
+func (b *Builder[T]) Page(page, pageSize int) *Builder[T] {
 	if page <= 0 {
 		page = 1
 	}
@@ -239,64 +183,43 @@ func (b *Builder) Page(page, pageSize int) *Builder {
 }
 
 // Limit sets LIMIT.
-//
-// Example:
-//
-//	qb := query.New().Limit(100)
-//	_ = qb
-func (b *Builder) Limit(limit int) *Builder {
+func (b *Builder[T]) Limit(limit int) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Limit(limit)
 	})
 }
 
 // Offset sets OFFSET.
-//
-// Example:
-//
-//	qb := query.New().Offset(200)
-//	_ = qb
-func (b *Builder) Offset(offset int) *Builder {
+func (b *Builder[T]) Offset(offset int) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Offset(offset)
 	})
 }
 
 // Unscoped disables default scopes such as soft deletes.
-//
-// Example:
-//
-//	qb := query.New().Unscoped()
-//	_ = qb
-func (b *Builder) Unscoped() *Builder {
+func (b *Builder[T]) Unscoped() *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Unscoped()
 	})
 }
 
 // Scope applies one or more GORM scopes.
-//
-// Example:
-//
-//	qb := query.New().Scope(func(db *gorm.DB) *gorm.DB { return db.Where("status = ?", 1) })
-//	_ = qb
-func (b *Builder) Scope(funcs ...func(*gorm.DB) *gorm.DB) *Builder {
+func (b *Builder[T]) Scope(funcs ...func(*gorm.DB) *gorm.DB) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Scopes(funcs...)
 	})
 }
 
-func (b *Builder) nested(conds []Condition, applier func(db, nested *gorm.DB) *gorm.DB) *Builder {
+func (b *Builder[T]) nested(conds []Condition, applier func(db, nested *gorm.DB) *gorm.DB) *Builder[T] {
 	if len(conds) == 0 {
 		return b
 	}
-
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return applier(db, gormx.BuildNested(db, conds))
 	})
 }
 
-func (b *Builder) bind(conds ...Condition) *Builder {
+func (b *Builder[T]) bind(conds ...Condition) *Builder[T] {
 	b.conditions = append(b.conditions, conds...)
 	return b
 }

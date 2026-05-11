@@ -1,6 +1,7 @@
 package reflectx
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 
@@ -10,6 +11,28 @@ import (
 
 type localReflectModel struct {
 	ID uint
+}
+
+func TestUnwrapPtr(t *testing.T) {
+	t.Run("nil returns nil", func(t *testing.T) {
+		assert.Nil(t, UnwrapPtr(nil))
+	})
+
+	t.Run("non pointer returns same type", func(t *testing.T) {
+		typ := reflect.TypeOf(0)
+		assert.Equal(t, typ, UnwrapPtr(typ))
+	})
+
+	t.Run("single pointer is unwrapped", func(t *testing.T) {
+		typ := reflect.TypeOf(&localReflectModel{})
+		assert.Equal(t, reflect.TypeOf(localReflectModel{}), UnwrapPtr(typ))
+	})
+
+	t.Run("multiple pointers are unwrapped", func(t *testing.T) {
+		ptr := &localReflectModel{}
+		typ := reflect.TypeOf(&ptr)
+		assert.Equal(t, reflect.TypeOf(localReflectModel{}), UnwrapPtr(typ))
+	})
 }
 
 func TestReflectxPackageName(t *testing.T) {

@@ -3,15 +3,14 @@ module github.com/im-wmkong/gorm-query
 go 1.21.0
 
 retract (
-	v1.0.0
-	v1.1.0
-	v1.2.0
 	v1.3.0
+	v1.2.0
+	v1.1.0
+	v1.0.0
 )
 
 require (
 	github.com/dave/jennifer v1.7.1
-	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.11.1
 	gorm.io/driver/sqlite v1.5.7
 	gorm.io/gorm v1.25.12

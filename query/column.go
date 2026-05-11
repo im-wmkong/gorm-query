@@ -1,340 +1,251 @@
 package query
 
 import (
-	"fmt"
+	"time"
 
+	"github.com/im-wmkong/gorm-query/internal/fragment"
 	"gorm.io/gorm"
 )
 
-// Column represents a database column name.
-//
-// Example:
-//
-//	// WHERE age >= 18 AND email LIKE "%@example.com%"
-//	qb := query.New().Where(
-//	    schema.User.Age.Gte(18),
-//	    schema.User.Email.Like("%@example.com%"),
-//	)
-//
-//	// ORDER BY created_at DESC
-//	qb = qb.Order(schema.User.CreatedAt.Desc())
-//	_ = qb
-type Column string
-
-var _ fmt.Stringer = Column("")
-
-// String returns the column as string.
-//
-// Example:
-//
-//	s := schema.User.Email.String()
-//	_ = s
-func (c Column) String() string {
-	return string(c)
+// SQLFragment is any value that can render itself as a SQL fragment.
+// Columns, ordered/aliased/aggregated expressions and raw fragments all
+// implement it, which is how Builder accepts heterogeneous inputs for
+// Select / Order / Group without losing type safety on WHERE operands.
+type SQLFragment interface {
+	SQL() string
 }
 
-// Eq builds an equality condition: column = value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.ID.Eq(1))
-//	_ = qb
-func (c Column) Eq(val any) Condition {
-	return c.compare("=", val)
+// RawFragment is a ready-to-use SQL fragment. It bypasses type checking;
+// use it only for expressions that the typed columns cannot express.
+type RawFragment string
+
+// SQL returns the raw SQL fragment.
+func (r RawFragment) SQL() string { return string(r) }
+
+// Numeric constrains numeric column value types.
+type Numeric interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64
 }
 
-// Neq builds an inequality condition: column <> value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Status.Neq(0))
-//	_ = qb
-func (c Column) Neq(val any) Condition {
-	return c.compare("<>", val)
+// Ordered constrains types that support ordering comparisons.
+type Ordered interface {
+	Numeric | ~string
 }
 
-// Gt builds a greater-than condition: column > value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Age.Gt(18))
-//	_ = qb
-func (c Column) Gt(val any) Condition {
-	return c.compare(">", val)
+// baseColumn carries table + column name shared by all typed columns.
+// The table qualifier is optional; when empty the column renders as bare name.
+type baseColumn struct {
+	table string
+	name  string
 }
 
-// Gte builds a greater-than-or-equal condition: column >= value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Age.Gte(18))
-//	_ = qb
-func (c Column) Gte(val any) Condition {
-	return c.compare(">=", val)
+// SQL returns the qualified column name, e.g. "users.id" or "id".
+func (c baseColumn) SQL() string {
+	if c.table == "" {
+		return c.name
+	}
+	return c.table + "." + c.name
 }
 
-// Lt builds a less-than condition: column < value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Age.Lt(65))
-//	_ = qb
-func (c Column) Lt(val any) Condition {
-	return c.compare("<", val)
-}
+// Name returns the raw column name (without table qualifier).
+func (c baseColumn) Name() string { return c.name }
 
-// Lte builds a less-than-or-equal condition: column <= value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Age.Lte(65))
-//	_ = qb
-func (c Column) Lte(val any) Condition {
-	return c.compare("<=", val)
-}
+// Table returns the table qualifier (may be empty).
+func (c baseColumn) Table() string { return c.table }
 
-// Like builds a LIKE condition: column LIKE value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Email.Like("%@example.com%"))
-//	_ = qb
-func (c Column) Like(val any) Condition {
-	return c.compare("LIKE", val)
-}
-
-// NotLike builds a NOT LIKE condition: column NOT LIKE value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Email.NotLike("%@example.com%"))
-//	_ = qb
-func (c Column) NotLike(val any) Condition {
-	return c.compare("NOT LIKE", val)
-}
-
-// Contains builds a LIKE condition: column LIKE %value%.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.UserName.Contains("li"))
-//	_ = qb
-func (c Column) Contains(val string) Condition {
-	return c.compare("LIKE", "%"+val+"%")
-}
-
-// NotContains builds a NOT LIKE condition: column NOT LIKE %value%.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.UserName.NotContains("admin"))
-//	_ = qb
-func (c Column) NotContains(val string) Condition {
-	return c.compare("NOT LIKE", "%"+val+"%")
-}
-
-// HasPrefix builds a LIKE condition: column LIKE value%.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.UserName.HasPrefix("Al"))
-//	_ = qb
-func (c Column) HasPrefix(val string) Condition {
-	return c.compare("LIKE", val+"%")
-}
-
-// HasSuffix builds a LIKE condition: column LIKE %value.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.UserName.HasSuffix("son"))
-//	_ = qb
-func (c Column) HasSuffix(val string) Condition {
-	return c.compare("LIKE", "%"+val)
-}
-
-// In builds an IN condition: column IN (values).
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.UserName.In([]string{"Alice", "Bob"}))
-//	_ = qb
-func (c Column) In(vals any) Condition {
-	return c.compare("IN", vals)
-}
-
-// NotIn builds a NOT IN condition: column NOT IN (values).
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.UserName.NotIn([]string{"admin", "root"}))
-//	_ = qb
-func (c Column) NotIn(vals any) Condition {
-	return c.compare("NOT IN", vals)
-}
-
-// Between builds a BETWEEN condition: column BETWEEN start AND end.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Age.Between(18, 30))
-//	_ = qb
-func (c Column) Between(start, end any) Condition {
-	return c.between("BETWEEN", start, end)
-}
-
-// NotBetween builds a NOT BETWEEN condition: column NOT BETWEEN start AND end.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.Age.NotBetween(18, 30))
-//	_ = qb
-func (c Column) NotBetween(start, end any) Condition {
-	return c.between("NOT BETWEEN", start, end)
+// WithTable returns a copy of the column qualified with the given table/alias.
+// Use it for joins or self-references without mutating the generated schema.
+func (c baseColumn) WithTable(table string) baseColumn {
+	return baseColumn{table: table, name: c.name}
 }
 
 // IsNull builds an IS NULL condition.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.DeletedAt.IsNull())
-//	_ = qb
-func (c Column) IsNull() Condition {
-	return c.clause("IS NULL")
-}
+func (c baseColumn) IsNull() Condition { return c.clause("IS NULL") }
 
 // IsNotNull builds an IS NOT NULL condition.
-//
-// Example:
-//
-//	qb := query.New().Where(schema.User.DeletedAt.IsNotNull())
-//	_ = qb
-func (c Column) IsNotNull() Condition {
-	return c.clause("IS NOT NULL")
+func (c baseColumn) IsNotNull() Condition { return c.clause("IS NOT NULL") }
+
+// Desc returns an ORDER BY fragment: "<col> DESC".
+func (c baseColumn) Desc() SQLFragment { return RawFragment(fragment.Suffix(c.SQL(), " DESC")) }
+
+// Asc returns an ORDER BY fragment: "<col> ASC".
+func (c baseColumn) Asc() SQLFragment { return RawFragment(fragment.Suffix(c.SQL(), " ASC")) }
+
+// As returns an aliased SELECT fragment: "<col> AS <alias>".
+func (c baseColumn) As(alias string) SQLFragment {
+	return RawFragment(fragment.Suffix(c.SQL(), " AS "+alias))
 }
 
-// Desc returns an ORDER BY fragment: "column DESC".
-//
-// Example:
-//
-//	qb := query.New().Order(schema.User.CreatedAt.Desc())
-//	_ = qb
-func (c Column) Desc() Column {
-	return Column(c.String() + " DESC")
+// Distinct returns a DISTINCT SELECT fragment: "DISTINCT <col>".
+func (c baseColumn) Distinct() SQLFragment { return RawFragment(fragment.Prefix("DISTINCT ", c.SQL())) }
+
+// Sum returns aggregate "SUM(<col>)".
+func (c baseColumn) Sum() AggFragment { return c.agg("SUM") }
+
+// Count returns aggregate "COUNT(<col>)".
+func (c baseColumn) Count() AggFragment { return c.agg("COUNT") }
+
+// Avg returns aggregate "AVG(<col>)".
+func (c baseColumn) Avg() AggFragment { return c.agg("AVG") }
+
+// Max returns aggregate "MAX(<col>)".
+func (c baseColumn) Max() AggFragment { return c.agg("MAX") }
+
+// Min returns aggregate "MIN(<col>)".
+func (c baseColumn) Min() AggFragment { return c.agg("MIN") }
+
+// AggFragment is an aggregate expression (SUM/COUNT/...). It is also a SQLFragment
+// and can be further aliased with As.
+type AggFragment string
+
+// SQL returns the aggregate expression.
+func (a AggFragment) SQL() string { return string(a) }
+
+// As gives the aggregate an alias, producing e.g. "SUM(age) AS age_sum".
+func (a AggFragment) As(alias string) SQLFragment {
+	return RawFragment(fragment.Suffix(string(a), " AS "+alias))
 }
 
-// Asc returns an ORDER BY fragment: "column ASC".
-//
-// Example:
-//
-//	qb := query.New().Order(schema.User.CreatedAt.Asc())
-//	_ = qb
-func (c Column) Asc() Column {
-	return Column(c.String() + " ASC")
+// ValueColumn is a typed column without extra operators beyond equality / in / null.
+// It is the base for StringColumn / NumericColumn / TimeColumn / BoolColumn via
+// embedding and is also used as the fallback for unknown custom types.
+type ValueColumn[T any] struct {
+	baseColumn
 }
 
-// Table qualifies the column with table name: "table.column".
-//
-// Example:
-//
-//	col := schema.User.Email.Table("users")
-//	_ = col
-func (c Column) Table(name string) Column {
-	return Column(name + "." + c.String())
+// NewValueColumn constructs a ValueColumn[T].
+func NewValueColumn[T any](table, name string) ValueColumn[T] {
+	return ValueColumn[T]{baseColumn: baseColumn{table: table, name: name}}
 }
 
-// As returns an aliased SELECT fragment: "column AS alias".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.Email.As("user_name"))
-//	_ = qb
-func (c Column) As(alias string) Column {
-	return Column(c.String() + " AS " + alias)
+// Eq builds "<col> = ?".
+func (c ValueColumn[T]) Eq(v T) Condition { return c.compare("=", v) }
+
+// Neq builds "<col> <> ?".
+func (c ValueColumn[T]) Neq(v T) Condition { return c.compare("<>", v) }
+
+// In builds "<col> IN ?".
+func (c ValueColumn[T]) In(vs []T) Condition { return c.clause("IN ?", vs) }
+
+// NotIn builds "<col> NOT IN ?".
+func (c ValueColumn[T]) NotIn(vs []T) Condition { return c.clause("NOT IN ?", vs) }
+
+// Set produces an assignment "<col> = v" for Repository.Updates.
+// Uses the bare column name (without table qualifier) since UPDATE targets
+// a single table and GORM does not accept qualified names here.
+func (c ValueColumn[T]) Set(v T) Assignment {
+	return Assignment{Column: c.Name(), Value: v}
 }
 
-// Distinct returns a DISTINCT SELECT fragment: "DISTINCT column".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.Email.Distinct())
-//	_ = qb
-func (c Column) Distinct() Column {
-	return Column("DISTINCT " + c.String())
+// orderable[T] adds the ordered comparison operators (Gt / Gte / Lt / Lte /
+// Between / NotBetween) on top of ValueColumn[T]. It is embedded by every
+// typed column whose underlying SQL type supports ordering (numeric, string,
+// time). T is intentionally unconstrained here because SQL itself happily
+// orders strings, numbers and times alike; the *outer* column types decide
+// which T's are allowed (via Numeric / ~string / time.Time).
+type orderable[T any] struct {
+	ValueColumn[T]
 }
 
-// Sum returns an aggregate SELECT fragment: "SUM(column)".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.Age.Sum().As("age_sum"))
-//	_ = qb
-func (c Column) Sum() Column {
-	return Column("SUM(" + c.String() + ")")
+func (c orderable[T]) Gt(v T) Condition  { return c.compare(">", v) }
+func (c orderable[T]) Gte(v T) Condition { return c.compare(">=", v) }
+func (c orderable[T]) Lt(v T) Condition  { return c.compare("<", v) }
+func (c orderable[T]) Lte(v T) Condition { return c.compare("<=", v) }
+func (c orderable[T]) Between(lo, hi T) Condition {
+	return c.clause("BETWEEN ? AND ?", lo, hi)
+}
+func (c orderable[T]) NotBetween(lo, hi T) Condition {
+	return c.clause("NOT BETWEEN ? AND ?", lo, hi)
 }
 
-// Count returns an aggregate SELECT fragment: "COUNT(column)".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.ID.Count().As("cnt"))
-//	_ = qb
-func (c Column) Count() Column {
-	return Column("COUNT(" + c.String() + ")")
+// StringColumn is a typed column for string-like values. It exposes the
+// string-only operators (Like / HasPrefix / ...) on top of orderable's API.
+type StringColumn[T ~string] struct {
+	orderable[T]
 }
 
-// Avg returns an aggregate SELECT fragment: "AVG(column)".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.Age.Avg().As("age_avg"))
-//	_ = qb
-func (c Column) Avg() Column {
-	return Column("AVG(" + c.String() + ")")
+// NewStringColumn constructs a StringColumn[T].
+func NewStringColumn[T ~string](table, name string) StringColumn[T] {
+	return StringColumn[T]{orderable: orderable[T]{ValueColumn: NewValueColumn[T](table, name)}}
 }
 
-// Max returns an aggregate SELECT fragment: "MAX(column)".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.Age.Max().As("age_max"))
-//	_ = qb
-func (c Column) Max() Column {
-	return Column("MAX(" + c.String() + ")")
+// Like builds "<col> LIKE ?".
+func (c StringColumn[T]) Like(pattern string) Condition { return c.compare("LIKE", pattern) }
+
+// NotLike builds "<col> NOT LIKE ?".
+func (c StringColumn[T]) NotLike(pattern string) Condition { return c.compare("NOT LIKE", pattern) }
+
+// Contains builds "<col> LIKE %v%".
+func (c StringColumn[T]) Contains(v string) Condition { return c.compare("LIKE", "%"+v+"%") }
+
+// NotContains builds "<col> NOT LIKE %v%".
+func (c StringColumn[T]) NotContains(v string) Condition {
+	return c.compare("NOT LIKE", "%"+v+"%")
 }
 
-// Min returns an aggregate SELECT fragment: "MIN(column)".
-//
-// Example:
-//
-//	qb := query.New().Select(schema.User.Age.Min().As("age_min"))
-//	_ = qb
-func (c Column) Min() Column {
-	return Column("MIN(" + c.String() + ")")
+// HasPrefix builds "<col> LIKE v%".
+func (c StringColumn[T]) HasPrefix(v string) Condition { return c.compare("LIKE", v+"%") }
+
+// HasSuffix builds "<col> LIKE %v".
+func (c StringColumn[T]) HasSuffix(v string) Condition { return c.compare("LIKE", "%"+v) }
+
+// NumericColumn is a typed column for numeric values (integers / floats).
+// Ordered comparisons + Between / NotBetween come from the embedded orderable.
+type NumericColumn[T Numeric] struct {
+	orderable[T]
 }
 
-func (c Column) compare(op string, val any) Condition {
+// NewNumericColumn constructs a NumericColumn[T].
+func NewNumericColumn[T Numeric](table, name string) NumericColumn[T] {
+	return NumericColumn[T]{orderable: orderable[T]{ValueColumn: NewValueColumn[T](table, name)}}
+}
+
+// TimeColumn is a typed column for time.Time values.
+// Ordered comparisons + Between / NotBetween come from the embedded orderable.
+type TimeColumn struct {
+	orderable[time.Time]
+}
+
+// NewTimeColumn constructs a TimeColumn.
+func NewTimeColumn(table, name string) TimeColumn {
+	return TimeColumn{orderable: orderable[time.Time]{ValueColumn: NewValueColumn[time.Time](table, name)}}
+}
+
+// BoolColumn is a typed column for boolean values.
+type BoolColumn struct {
+	ValueColumn[bool]
+}
+
+// NewBoolColumn constructs a BoolColumn.
+func NewBoolColumn(table, name string) BoolColumn {
+	return BoolColumn{ValueColumn: NewValueColumn[bool](table, name)}
+}
+
+// IsTrue is a semantic alias for Eq(true).
+func (c BoolColumn) IsTrue() Condition { return c.compare("=", true) }
+
+// IsFalse is a semantic alias for Eq(false).
+func (c BoolColumn) IsFalse() Condition { return c.compare("=", false) }
+
+// ---- internal helpers ----
+
+// agg is the single source of truth for "<FN>(<col>)" aggregate fragments.
+func (c baseColumn) agg(fn string) AggFragment {
+	return AggFragment(fragment.Call(fn, c.SQL()))
+}
+
+func (c baseColumn) compare(op string, val any) Condition {
 	return c.clause(op+" ?", val)
 }
 
-func (c Column) between(op string, start, end any) Condition {
-	return c.clause(op+" ? AND ?", start, end)
-}
-
-func (c Column) clause(suffix string, args ...any) Condition {
+func (c baseColumn) clause(suffix string, args ...any) Condition {
+	qualified := c.SQL()
 	return func(db *gorm.DB) *gorm.DB {
 		if len(args) == 0 {
-			return db.Where(c.String() + " " + suffix)
+			return db.Where(qualified + " " + suffix)
 		}
-
-		resolved := make([]any, len(args))
-		for i, arg := range args {
-			if col, ok := arg.(Column); ok {
-				resolved[i] = gorm.Expr(col.String())
-			} else {
-				resolved[i] = arg
-			}
-		}
-		return db.Where(c.String()+" "+suffix, resolved...)
+		return db.Where(qualified+" "+suffix, args...)
 	}
 }
