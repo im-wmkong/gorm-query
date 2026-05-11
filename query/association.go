@@ -1,7 +1,5 @@
 package query
 
-import "github.com/im-wmkong/gorm-query/internal/fragment"
-
 // Association represents a GORM association between a Parent entity P and a
 // Child entity C (e.g. User has-one Profile yields Association[User, Profile]).
 // The path is a GORM association field name like "Profile", possibly joined
@@ -55,5 +53,5 @@ type nestable[P any] interface {
 //	qb := query.New[model.User]().Preload(rel)
 //	_ = qb
 func (a Association[P, C]) Nested(sub nestable[C]) Association[P, any] {
-	return Association[P, any]{path: fragment.JoinPath(a.path, sub.Path(), ".")}
+	return Association[P, any]{path: a.path + "." + sub.Path()}
 }

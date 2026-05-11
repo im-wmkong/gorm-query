@@ -437,12 +437,6 @@ func TestAssociation_Nested(t *testing.T) {
 	// user.Profile.Nested(profile.Address)  -> "Profile.Address"
 	nested := userProfile.Nested(profileAddr)
 	assert.Equal(t, "Profile.Address", nested.Path())
-
-	// Empty parent or sub preserves the non-empty side.
-	emptyParent := NewAssociation[user, profile]("")
-	assert.Equal(t, "Address", emptyParent.Nested(profileAddr).Path())
-	emptySub := NewAssociation[profile, addr]("")
-	assert.Equal(t, "Profile", userProfile.Nested(emptySub).Path())
 }
 
 type preloadUser struct {

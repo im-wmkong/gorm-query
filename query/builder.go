@@ -7,7 +7,6 @@
 package query
 
 import (
-	"github.com/im-wmkong/gorm-query/internal/fragment"
 	"github.com/im-wmkong/gorm-query/internal/gormx"
 	"gorm.io/gorm"
 )
@@ -87,16 +86,15 @@ func (b *Builder[T]) Select(cols ...SQLFragment) *Builder[T] {
 	if len(cols) == 0 {
 		return b
 	}
-	head := cols[0].SQL()
-	rest := fragment.RenderAllAny(cols[1:])
+	names := SQLFragments(cols).Strings()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Select(head, rest...)
+		return db.Select(names)
 	})
 }
 
 // Omit omits columns.
 func (b *Builder[T]) Omit(cols ...SQLFragment) *Builder[T] {
-	names := fragment.RenderAll(cols)
+	names := SQLFragments(cols).Strings()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Omit(names...)
 	})
@@ -104,7 +102,7 @@ func (b *Builder[T]) Omit(cols ...SQLFragment) *Builder[T] {
 
 // Distinct adds DISTINCT to the query.
 func (b *Builder[T]) Distinct(cols ...SQLFragment) *Builder[T] {
-	args := fragment.RenderAllAny(cols)
+	args := SQLFragments(cols).Anys()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Distinct(args...)
 	})
