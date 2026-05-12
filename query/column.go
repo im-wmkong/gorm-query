@@ -128,12 +128,12 @@ func (c ValueColumn[T]) Neq(v T) Condition {
 
 // In builds "<col> IN ?".
 func (c ValueColumn[T]) In(vs []T) Condition {
-	return c.clause("IN ?", vs)
+	return c.compare("IN", vs)
 }
 
 // NotIn builds "<col> NOT IN ?".
 func (c ValueColumn[T]) NotIn(vs []T) Condition {
-	return c.clause("NOT IN ?", vs)
+	return c.compare("NOT IN", vs)
 }
 
 // Set produces an assignment "<col> = v" for Repository.Updates.
@@ -170,11 +170,11 @@ func (c orderable[T]) Lte(v T) Condition {
 }
 
 func (c orderable[T]) Between(lo, hi T) Condition {
-	return c.clause("BETWEEN ? AND ?", lo, hi)
+	return c.between("BETWEEN", lo, hi)
 }
 
 func (c orderable[T]) NotBetween(lo, hi T) Condition {
-	return c.clause("NOT BETWEEN ? AND ?", lo, hi)
+	return c.between("NOT BETWEEN", lo, hi)
 }
 
 // StringColumn is a typed column for string-like values. It exposes the
@@ -269,6 +269,10 @@ func (c baseColumn) agg(fn string) AggFragment {
 
 func (c baseColumn) compare(op string, val any) Condition {
 	return c.clause(op+" ?", val)
+}
+
+func (c baseColumn) between(op string, lo, hi any) Condition {
+	return c.clause(op+" ? AND ?", lo, hi)
 }
 
 func (c baseColumn) clause(suffix string, args ...any) Condition {
