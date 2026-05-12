@@ -259,7 +259,7 @@ func TestQuery_Null_NotNull_WithSoftDelete(t *testing.T) {
 	assert.Equal(t, "Alice", users[0].UserName)
 }
 
-func TestQuery_Or_Not_Clone_EmptyNested(t *testing.T) {
+func TestQuery_Or_Not_Derived_EmptyNested(t *testing.T) {
 	db := openTestDB(t)
 	seedUsers(t, db)
 
@@ -269,7 +269,7 @@ func TestQuery_Or_Not_Clone_EmptyNested(t *testing.T) {
 	require.Len(t, users, 2)
 
 	base := New[user]().Where(userSchema.Status.Eq(1))
-	derived := base.Clone().Where(userSchema.UserName.Eq("Alice"))
+	derived := base.Where(userSchema.UserName.Eq("Alice"))
 	users, err = applyFind(t, db, base)
 	require.NoError(t, err)
 	require.Len(t, users, 5)
@@ -612,4 +612,68 @@ func TestAssociation_ParentMatching(t *testing.T) {
 	a := NewAssociation[preloadUser, preloadOrder]("Orders")
 	var n nestable[preloadUser] = a
 	assert.Equal(t, "Orders", n.Path())
+}
+
+// TestBuilder_Immutability verifies that chaining methods on a Builder never
+// mutates the receiver, so the same base builder can be safely reused to
+// derive several independent queries without calling Clone.
+func TestBuilder_Immutability(t *testing.T) {
+	db := openTestDB(t)
+	seedUsers(t, db)
+
+	base := New[user]().Where(userSchema.Status.Eq(1))
+
+	// Two derivations from the same base, no Clone in between.
+	adults := base.Where(userSchema.Age.Gte(30))
+	minors := base.Where(userSchema.Age.Lt(30))
+
+	// Each derived builder must own a fresh condition slice.
+	assert.Len(t, base.conditions, 1, "base must remain unchanged")
+	assert.Len(t, adults.conditions, 2)
+	assert.Len(t, minors.conditions, 2)
+
+	// Pointer identity: derivations are NEW Builders.
+	assert.NotSame(t, base, adults)
+	assert.NotSame(t, base, minors)
+	assert.NotSame(t, adults, minors)
+
+	// Behavioral check: the two derivations select different rows, and base
+	// still selects everyone with Status == 1.
+	adultUsers, err := applyFind(t, db, adults)
+	require.NoError(t, err)
+	assert.Len(t, adultUsers, 3)
+
+	minorUsers, err := applyFind(t, db, minors)
+	require.NoError(t, err)
+	assert.Len(t, minorUsers, 2)
+
+	allActive, err := applyFind(t, db, base)
+	require.NoError(t, err)
+	assert.Len(t, allActive, 5)
+}
+
+// TestBuilder_NoSharedBackingArray guards against the slice-aliasing bug:
+// when bind reuses the parent's underlying array, two siblings derived from
+// the same base can stomp on each other's conditions. With proper allocation
+// the second sibling's append must not be visible to the first.
+func TestBuilder_NoSharedBackingArray(t *testing.T) {
+	db := openTestDB(t)
+	seedUsers(t, db)
+
+	base := New[user]().Where(userSchema.Status.Eq(1))
+
+	first := base.Where(userSchema.UserName.Eq("Alice"))
+	// If `bind` re-used base's slice, the next append below would overwrite
+	// the third slot of `first` and turn its second condition into Bob.
+	second := base.Where(userSchema.UserName.Eq("Bob"))
+
+	users, err := applyFind(t, db, first)
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	assert.Equal(t, "Alice", users[0].UserName)
+
+	users, err = applyFind(t, db, second)
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	assert.Equal(t, "Bob", users[0].UserName)
 }

@@ -1,9 +1,10 @@
 // Package query provides the core of a type-safe GORM query builder.
 //
-// It builds queries dynamically via the functional Condition pattern and supports
-// deep-copying (Clone) to avoid condition slice aliasing across derived queries.
-// It is typically used together with the generated schema (e.g. schema.User) to
-// provide a smooth, type-safe, chainable SQL building experience.
+// It builds queries dynamically via the functional Condition pattern. Builders
+// are immutable: every chained method returns a new Builder, so derived
+// queries never share state with their base. It is typically used together
+// with the generated schema (e.g. schema.User) to provide a smooth, type-safe,
+// chainable SQL building experience.
 package query
 
 import (
@@ -16,9 +17,17 @@ import (
 type Condition func(db *gorm.DB) *gorm.DB
 
 // Builder accumulates query conditions for a specific entity type T.
-// Builder is NOT concurrency-safe; do not use the same instance in multiple
-// goroutines. If you need to reuse conditions concurrently, call Clone to get
-// an independent copy.
+//
+// Builder is immutable: every chained method (Where, Or, Select, ...) returns
+// a NEW Builder and leaves the receiver unchanged. Deriving multiple queries
+// from the same base builder is therefore safe without an explicit copy:
+//
+//	base    := query.New[User]().Where(schema.User.Status.Eq(1))
+//	adults  := base.Where(schema.User.Age.Gte(18)) // does NOT mutate base
+//	minors  := base.Where(schema.User.Age.Lt(18))  // does NOT mutate base
+//
+// Because the receiver is never mutated, a Builder is also safe to be read
+// concurrently from multiple goroutines once it is fully constructed.
 //
 // The type parameter T ties Preload to associations whose Parent is T, so that
 // schema.Order.Items cannot be preloaded through a Builder[User].
@@ -52,13 +61,6 @@ func (b *Builder[T]) Apply(db *gorm.DB) *gorm.DB {
 		db = cond(db)
 	}
 	return db
-}
-
-// Clone makes a deep copy of the builder so common conditions can be reused safely.
-func (b *Builder[T]) Clone() *Builder[T] {
-	conditions := make([]Condition, len(b.conditions))
-	copy(conditions, b.conditions)
-	return &Builder[T]{conditions: conditions}
 }
 
 // Where appends one or more conditions.
@@ -218,6 +220,14 @@ func (b *Builder[T]) nested(conds []Condition, applier func(db, nested *gorm.DB)
 }
 
 func (b *Builder[T]) bind(conds ...Condition) *Builder[T] {
-	b.conditions = append(b.conditions, conds...)
-	return b
+	if len(conds) == 0 {
+		return b
+	}
+	// Allocate a fresh slice with cap == len so that two Builders derived from
+	// the same parent can never overwrite each other's conditions through a
+	// shared underlying array.
+	conditions := make([]Condition, len(b.conditions)+len(conds))
+	copy(conditions, b.conditions)
+	copy(conditions[len(b.conditions):], conds)
+	return &Builder[T]{conditions: conditions}
 }

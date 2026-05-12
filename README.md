@@ -30,7 +30,7 @@ GORM Query consists of 4 core modules:
 | Module | Core Responsibility | Key Capabilities / Methods |
 | :--- | :--- | :--- |
 | **`schemagen`** | **Code Generation** | Generates schema definitions like `schema.User` (columns + associations) from GORM models. Supports custom output, package names, and dry-run validation. |
-| **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Joins`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`, `String`... |
+| **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Joins`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`... |
 | **`repo`** | **Generic Repository** | Provides common CRUD methods: `Create`, `Save`, `Find`, `First`, `Update`, `Delete`, `Pluck`... |
 | **`db`** | **Context Transaction** | `db.Client` implements both `DBProvider` and `Transactor`. Repositories automatically reuse the same transaction via `ctx`. |
 
@@ -195,22 +195,6 @@ func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]
     // 2. Pass the builder directly to the generic Find method
     return s.users.Find(ctx, qb)
 }
-```
-
-### 3. Query Reuse (Cloning)
-
-Use `.Clone()` when multiple derived queries start from the same base builder.
-
-It helps you derive new queries from a base query without polluting the original:
-
-```go
-baseQuery := query.New[model.User]().Where(schema.User.Status.Eq(1))
-
-// Derived Query A
-adults := baseQuery.Clone().Where(schema.User.Age.Gte(18))
-
-// Derived Query B (Will NOT include Age >= 18 condition)
-minors := baseQuery.Clone().Where(schema.User.Age.Lt(18))
 ```
 
 ## 🤝 Contributing

@@ -28,7 +28,7 @@ GORM Query 的核心能力由以下 4 个模块构成，它们各司其职，又
 | 模块 | 核心职责 | 典型能力 / 方法 |
 | :--- | :--- | :--- |
 | **`schemagen`** | **代码生成** | 解析 GORM 模型生成强类型 schema 定义（列 + 关联）。支持自定义输出目录、包名及 Dry-run 校验。 |
-| **`query`** | **动态查询构建** | **Builder**: `Where`, `Select`, `Joins`, `Preload`, `Page`, `Clone`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`, `String`... |
+| **`query`** | **动态查询构建** | **Builder**: `Where`, `Select`, `Joins`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`... |
 | **`repo`** | **泛型仓储** | 提供通用 CRUD：`Create`, `Find`, `First`, `Update`, `Delete`, `Count`, `Pluck`... |
 | **`db`** | **上下文事务管理** | 提供 `db.Client`，支持通过 `context.Context` 无感传递事务连接，避免手动透传 DB。 |
 
@@ -214,22 +214,6 @@ func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name stri
     
     return users, nil
 }
-```
-
-### 3. 查询条件的复用 (防污染)
-
-当你需要从同一个基础 builder 派生多个查询时，请使用 `.Clone()`。
-
-它可以防止底层切片共享带来的条件污染：
-
-```go
-baseQuery := query.New[model.User]().Where(schema.User.Status.Eq(1))
-
-// 派生查询 A
-adultsQuery := baseQuery.Clone().Where(schema.User.Age.Gte(18))
-
-// 派生查询 B (不会包含 Age >= 18 的条件)
-minorsQuery := baseQuery.Clone().Where(schema.User.Age.Lt(18))
 ```
 
 ## 🤝 参与贡献
