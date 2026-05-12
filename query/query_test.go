@@ -339,15 +339,6 @@ func TestQuery_Limit_Offset_Unscoped_Order_Joins_Scope(t *testing.T) {
 	users, err = applyFind(t, db, New[user]().Order(userSchema.ID.Desc()))
 	require.NoError(t, err)
 	assert.Equal(t, "admin", users[0].UserName)
-
-	// joins
-	qJoin := New[user]().Joins("JOIN users as u2 ON users.id = u2.id").Where(func(db *gorm.DB) *gorm.DB {
-		return db.Where("u2.user_name = ?", "Alice")
-	})
-	users, err = applyFind(t, db, qJoin)
-	require.NoError(t, err)
-	require.Len(t, users, 1)
-	assert.Equal(t, "Alice", users[0].UserName)
 }
 
 func TestColumn_Helpers_AndNeq(t *testing.T) {

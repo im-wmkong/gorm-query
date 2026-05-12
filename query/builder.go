@@ -110,13 +110,6 @@ func (b *Builder[T]) Distinct(cols ...SQLFragment) *Builder[T] {
 	})
 }
 
-// Joins adds a raw JOIN clause. args are bound to ? placeholders in sql.
-func (b *Builder[T]) Joins(sql string, args ...any) *Builder[T] {
-	return b.bind(func(db *gorm.DB) *gorm.DB {
-		return db.Joins(sql, args...)
-	})
-}
-
 // Preload preloads an association. The association's Parent must be T; the
 // compiler rejects Preload(schema.Order.Items) on a Builder[User].
 // Extra conditions (if provided) are applied to the preload query as a nested scope.

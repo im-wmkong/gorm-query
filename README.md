@@ -30,7 +30,7 @@ GORM Query consists of 4 core modules:
 | Module | Core Responsibility | Key Capabilities / Methods |
 | :--- | :--- | :--- |
 | **`schemagen`** | **Code Generation** | Generates schema definitions like `schema.User` (columns + associations) from GORM models. Supports custom output, package names, and dry-run validation. |
-| **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Joins`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`... |
+| **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`... |
 | **`repo`** | **Generic Repository** | Provides common CRUD methods: `Create`, `Save`, `Find`, `First`, `Update`, `Delete`, `Pluck`... |
 | **`db`** | **Context Transaction** | `db.Client` implements both `DBProvider` and `Transactor`. Repositories automatically reuse the same transaction via `ctx`. |
 
