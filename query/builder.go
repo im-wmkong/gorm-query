@@ -57,10 +57,7 @@ func New[T any]() *Builder[T] {
 
 // Apply applies all accumulated conditions to the given gorm.DB session.
 func (b *Builder[T]) Apply(db *gorm.DB) *gorm.DB {
-	for _, cond := range b.conditions {
-		db = cond(db)
-	}
-	return db
+	return gormx.Apply(db, b.conditions)
 }
 
 // Where appends one or more conditions.
@@ -129,10 +126,7 @@ func (b *Builder[T]) Preload(assoc nestable[T], conds ...Condition) *Builder[T] 
 			return db.Preload(path)
 		}
 		return db.Preload(path, func(tx *gorm.DB) *gorm.DB {
-			for _, cond := range conds {
-				tx = cond(tx)
-			}
-			return tx
+			return gormx.Apply(tx, conds)
 		})
 	})
 }

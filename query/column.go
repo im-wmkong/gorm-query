@@ -13,9 +13,10 @@ type Numeric interface {
 		~float32 | ~float64
 }
 
-// Ordered constrains types that support ordering comparisons.
+// Ordered constrains types that support ordering comparisons (numeric,
+// string-like and time.Time).
 type Ordered interface {
-	Numeric | ~string
+	Numeric | ~string | time.Time
 }
 
 // baseColumn carries table + column name shared by all typed columns.
@@ -144,12 +145,9 @@ func (c ValueColumn[T]) Set(v T) Assignment {
 }
 
 // orderable[T] adds the ordered comparison operators (Gt / Gte / Lt / Lte /
-// Between / NotBetween) on top of ValueColumn[T]. It is embedded by every
-// typed column whose underlying SQL type supports ordering (numeric, string,
-// time). T is intentionally unconstrained here because SQL itself happily
-// orders strings, numbers and times alike; the *outer* column types decide
-// which T's are allowed (via Numeric / ~string / time.Time).
-type orderable[T any] struct {
+// Between / NotBetween) on top of ValueColumn[T]. T is constrained by Ordered
+// so only numeric, string-like and time.Time columns can embed it.
+type orderable[T Ordered] struct {
 	ValueColumn[T]
 }
 
