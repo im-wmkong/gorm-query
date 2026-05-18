@@ -39,10 +39,7 @@ func (r *stubUserRepo) Create(_ context.Context, _ *model.User) error {
 func (r *stubUserRepo) CreateInBatches(context.Context, []*model.User, int) (int64, error) {
 	panic("not used")
 }
-func (r *stubUserRepo) Update(context.Context, *query.Builder[model.User], query.Assignment) (int64, error) {
-	panic("not used")
-}
-func (r *stubUserRepo) Updates(context.Context, *query.Builder[model.User], ...query.Assignment) (int64, error) {
+func (r *stubUserRepo) Update(context.Context, *query.Builder[model.User], ...query.Assignment) (int64, error) {
 	panic("not used")
 }
 func (r *stubUserRepo) Delete(context.Context, *query.Builder[model.User]) (int64, error) {
@@ -63,6 +60,9 @@ func (r *stubUserRepo) Last(context.Context, *query.Builder[model.User]) (*model
 func (r *stubUserRepo) Count(context.Context, *query.Builder[model.User]) (int64, error) {
 	r.countCalled++
 	return r.count, r.countErr
+}
+func (r *stubUserRepo) Exists(context.Context, *query.Builder[model.User]) (bool, error) {
+	panic("not used")
 }
 func (r *stubUserRepo) Pluck(context.Context, *query.Builder[model.User], query.SQLFragment, any) error {
 	panic("not used")

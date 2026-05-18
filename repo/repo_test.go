@@ -98,7 +98,7 @@ func TestBaseRepository_NotFoundReturnsNilEntity(t *testing.T) {
 	require.Nil(t, got)
 }
 
-func TestBaseRepository_UpdateAndUpdates(t *testing.T) {
+func TestBaseRepository_Update(t *testing.T) {
 	gormDB := openRepoTestDB(t)
 	client := db.NewClient(gormDB)
 	r := New[user](client)
@@ -110,7 +110,7 @@ func TestBaseRepository_UpdateAndUpdates(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
 
-	rows, err = r.Updates(ctx, query.New[user]().Where(userSchema.UserName.Eq("Bob")),
+	rows, err = r.Update(ctx, query.New[user]().Where(userSchema.UserName.Eq("Bob")),
 		userSchema.Status.Set(2),
 		userSchema.Email.Set("bob2@example.com"),
 	)
@@ -232,6 +232,35 @@ func TestBaseRepository_Save(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, 26, got.Age)
+}
+
+func TestBaseRepository_Exists(t *testing.T) {
+	gormDB := openRepoTestDB(t)
+	client := db.NewClient(gormDB)
+	r := New[user](client)
+	ctx := context.Background()
+
+	// empty table
+	exists, err := r.Exists(ctx, query.New[user]().Where(userSchema.UserName.Eq("Alice")))
+	require.NoError(t, err)
+	assert.False(t, exists)
+
+	seedUsers(t, r, ctx)
+
+	// matched
+	exists, err = r.Exists(ctx, query.New[user]().Where(userSchema.UserName.Eq("Alice")))
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// unmatched
+	exists, err = r.Exists(ctx, query.New[user]().Where(userSchema.UserName.Eq("nobody")))
+	require.NoError(t, err)
+	assert.False(t, exists)
+
+	// nil builder: any record exists
+	exists, err = r.Exists(ctx, nil)
+	require.NoError(t, err)
+	assert.True(t, exists)
 }
 
 func TestBaseRepository_FirstTakeLast_SuccessAndNotFound(t *testing.T) {

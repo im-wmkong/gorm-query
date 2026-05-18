@@ -21,14 +21,14 @@ type Repository[T any] interface {
 	Save(ctx context.Context, entity *T) error
 	Create(ctx context.Context, entity *T) error
 	CreateInBatches(ctx context.Context, entities []*T, batchSize int) (int64, error)
-	Update(ctx context.Context, qb *query.Builder[T], assign query.Assignment) (int64, error)
-	Updates(ctx context.Context, qb *query.Builder[T], assigns ...query.Assignment) (int64, error)
+	Update(ctx context.Context, qb *query.Builder[T], assigns ...query.Assignment) (int64, error)
 	Delete(ctx context.Context, qb *query.Builder[T]) (int64, error)
 	Find(ctx context.Context, qb *query.Builder[T]) ([]*T, error)
 	First(ctx context.Context, qb *query.Builder[T]) (*T, error)
 	Take(ctx context.Context, qb *query.Builder[T]) (*T, error)
 	Last(ctx context.Context, qb *query.Builder[T]) (*T, error)
 	Count(ctx context.Context, qb *query.Builder[T]) (int64, error)
+	Exists(ctx context.Context, qb *query.Builder[T]) (bool, error)
 	Pluck(ctx context.Context, qb *query.Builder[T], column query.SQLFragment, dest any) error
 }
 
@@ -78,29 +78,21 @@ func (r *BaseRepository[T]) CreateInBatches(ctx context.Context, entities []*T, 
 	return result.RowsAffected, result.Error
 }
 
-// Update updates a single column for matched records.
+// Update updates one or more columns for matched records.
+// When no assignment is given, it is a no-op and returns (0, nil).
 //
 // Example:
 //
 //	qb := query.New[User]().Where(schema.User.ID.Eq(1))
-//	rows, err := r.Update(ctx, qb, schema.User.Status.Set(2))
-//	_, _ = rows, err
-func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder[T], assign query.Assignment) (int64, error) {
-	result := r.buildQuery(ctx, qb).Update(assign.Column, assign.Value)
-	return result.RowsAffected, result.Error
-}
-
-// Updates updates multiple columns for matched records.
-//
-// Example:
-//
-//	qb := query.New[User]().Where(schema.User.ID.Eq(1))
-//	rows, err := r.Updates(ctx, qb,
+//	rows, err := r.Update(ctx, qb,
 //	    schema.User.Status.Set(2),
 //	    schema.User.Email.Set("a@b.com"),
 //	)
 //	_, _ = rows, err
-func (r *BaseRepository[T]) Updates(ctx context.Context, qb *query.Builder[T], assigns ...query.Assignment) (int64, error) {
+func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder[T], assigns ...query.Assignment) (int64, error) {
+	if len(assigns) == 0 {
+		return 0, nil
+	}
 	values := query.Assignments(assigns).ToMap()
 	result := r.buildQuery(ctx, qb).Updates(values)
 	return result.RowsAffected, result.Error
@@ -158,6 +150,16 @@ func (r *BaseRepository[T]) Count(ctx context.Context, qb *query.Builder[T]) (in
 	var count int64
 	err := r.buildQuery(ctx, qb).Count(&count).Error
 	return count, err
+}
+
+// Exists reports whether any record matches the given conditions.
+func (r *BaseRepository[T]) Exists(ctx context.Context, qb *query.Builder[T]) (bool, error) {
+	var dst []int
+	result := r.buildQuery(ctx, qb).Select("1").Limit(1).Scan(&dst)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 // Pluck selects a single column into dest.
