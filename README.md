@@ -101,13 +101,12 @@ import (
 
     "your_project_name/model/schema"
     "your_project_name/model"
-    "github.com/im-wmkong/gorm-query/query"
 )
 
 var db *gorm.DB
 
 // 1. Build queries fluently
-qb := query.New[model.User]().
+qb := schema.User.Query().
     Where(
         schema.User.Age.Gte(18),
         schema.User.UserName.Contains("wmkong"),
@@ -183,7 +182,7 @@ Once your service already depends on a generic repository, `query.Builder` becom
 ```go
 func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]*model.User, error) {
     // 1. Build dynamic conditions
-    qb := query.New[model.User]().Where(schema.User.Status.Eq(1))
+    qb := schema.User.Query().Where(schema.User.Status.Eq(1))
 
     if name != "" {
         qb = qb.Where(schema.User.UserName.Contains(name))

@@ -99,13 +99,12 @@ import (
 
     "your_project_name/model/schema"
     "your_project_name/model"
-    "github.com/im-wmkong/gorm-query/query"
 )
 
 var db *gorm.DB
 
 // 1. 丝滑地构建查询条件
-qb := query.New[model.User]().
+qb := schema.User.Query().
     Where(
         schema.User.Age.Gte(18),
         schema.User.UserName.Contains("wmkong"),
@@ -194,7 +193,7 @@ func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User
 // ✅ 现代模式：极简的 Repository + 强大的 Builder
 func (s *UserService) GetUsersByDynamicConditions(ctx context.Context, name string, minAge int) ([]*model.User, error) {
     // 1. 使用 builder 自由组合查询条件
-    qb := query.New[model.User]().Where(
+    qb := schema.User.Query().Where(
         schema.User.Status.Eq(1), // 默认条件
     )
 
