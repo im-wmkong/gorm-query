@@ -1,4 +1,4 @@
-.PHONY: all tidy generate test clean
+.PHONY: all tidy generate test lint clean
 
 all: tidy generate test
 
@@ -13,6 +13,15 @@ generate:
 # 运行所有单元测试，并开启竞态检测
 test:
 	go test -v -race ./...
+
+# 静态检查（与 CI 一致）
+lint:
+	go vet ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --timeout=5m; \
+	else \
+		echo "golangci-lint not installed; skipping. Install: https://golangci-lint.run"; \
+	fi
 
 # 清理可能生成的临时文件或缓存
 clean:
