@@ -131,6 +131,38 @@ func (b *Builder[T]) Preload(assoc nestable[T], conds ...Condition) *Builder[T] 
 	})
 }
 
+// Joins performs a LEFT JOIN on the given association. The association's
+// Parent must be T; the compiler rejects Joins(schema.Order.Items) on a
+// Builder[User]. Extra conditions (if provided) are applied to the join's
+// ON clause as a nested scope.
+//
+// Example:
+//
+//	qb := query.New[User]().Joins(schema.User.Profile)
+//	qb = query.New[User]().Joins(
+//	    schema.User.Profile,
+//	    schema.Profile.City.Eq("SF"),
+//	)
+//	_ = qb
+func (b *Builder[T]) Joins(assoc nestable[T], conds ...Condition) *Builder[T] {
+	return b.joins(assoc, conds, func(db *gorm.DB, path string, args ...any) *gorm.DB {
+		return db.Joins(path, args...)
+	})
+}
+
+// InnerJoins performs an INNER JOIN on the given association. It mirrors
+// Joins but produces an inner join instead of a left join.
+//
+// Example:
+//
+//	qb := query.New[User]().InnerJoins(schema.User.Profile)
+//	_ = qb
+func (b *Builder[T]) InnerJoins(assoc nestable[T], conds ...Condition) *Builder[T] {
+	return b.joins(assoc, conds, func(db *gorm.DB, path string, args ...any) *gorm.DB {
+		return db.InnerJoins(path, args...)
+	})
+}
+
 // Group adds GROUP BY.
 func (b *Builder[T]) Group(col SQLFragment) *Builder[T] {
 	expr := col.SQL()
@@ -194,6 +226,16 @@ func (b *Builder[T]) Unscoped() *Builder[T] {
 func (b *Builder[T]) Scope(funcs ...func(*gorm.DB) *gorm.DB) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Scopes(funcs...)
+	})
+}
+
+func (b *Builder[T]) joins(assoc nestable[T], conds []Condition, applier func(db *gorm.DB, path string, args ...any) *gorm.DB) *Builder[T] {
+	path := assoc.Path()
+	return b.bind(func(db *gorm.DB) *gorm.DB {
+		if len(conds) == 0 {
+			return applier(db, path)
+		}
+		return applier(db, path, gormx.BuildNested(db, conds))
 	})
 }
 
