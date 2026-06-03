@@ -1,0 +1,33 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosimple
+    - typecheck
+
+linters-settings:
+  staticcheck:
+    checks: ["all"]
+
+issues:
+  exclude-rules:
+    # Generated schema files: relax checks on generated code.
+    - path: _gen\.go$
+      linters:
+        - errcheck
+        - staticcheck
+        - unused
+    # Test files: tolerate the occasional unchecked Close/Remove from helpers.
+    - path: _test\.go$
+      linters:
+        - errcheck
+  max-issues-per-linter: 0
+  max-same-issues: 0
