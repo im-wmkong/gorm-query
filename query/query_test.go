@@ -491,6 +491,115 @@ func TestQuery_Preload_WithConds(t *testing.T) {
 	assert.Empty(t, out[1].Orders)
 }
 
+// --- Joins ---
+
+type joinUser struct {
+	gorm.Model
+	Name      string
+	ProfileID uint
+	Profile   joinProfile
+}
+
+type joinProfile struct {
+	gorm.Model
+	City string
+}
+
+func openJoinTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	name := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
+	dsn := fmt.Sprintf("file:query_join_%s?mode=memory&cache=shared", name)
+
+	gormDB, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	require.NoError(t, err)
+	require.NoError(t, gormDB.AutoMigrate(&joinUser{}, &joinProfile{}))
+
+	return gormDB
+}
+
+func seedJoinUsers(t *testing.T, db *gorm.DB) (sf, ny *joinProfile) {
+	t.Helper()
+
+	sf = &joinProfile{City: "SF"}
+	ny = &joinProfile{City: "NY"}
+	require.NoError(t, db.Create(sf).Error)
+	require.NoError(t, db.Create(ny).Error)
+	require.NoError(t, db.Create([]*joinUser{
+		{Name: "Alice", ProfileID: sf.ID},
+		{Name: "Bob", ProfileID: ny.ID},
+		{Name: "Charlie"},
+	}).Error)
+	return sf, ny
+}
+
+func TestQuery_Joins_Association(t *testing.T) {
+	db := openJoinTestDB(t)
+	seedJoinUsers(t, db)
+
+	profile := NewAssociation[joinUser, joinProfile]("Profile")
+
+	// LEFT JOIN preserves users without a profile.
+	var all []joinUser
+	err := New[joinUser]().Joins(profile).Apply(db.Model(&joinUser{})).Order("`join_users`.id asc").Find(&all).Error
+	require.NoError(t, err)
+	require.Len(t, all, 3)
+}
+
+func TestQuery_Joins_AssociationWithConds(t *testing.T) {
+	db := openJoinTestDB(t)
+	seedJoinUsers(t, db)
+
+	profile := NewAssociation[joinUser, joinProfile]("Profile")
+	city := NewStringColumn[string]("", "city")
+
+	var users []joinUser
+	err := New[joinUser]().
+		Joins(profile, city.Eq("SF")).
+		Apply(db.Model(&joinUser{})).
+		Order("`join_users`.id asc").
+		Find(&users).Error
+	require.NoError(t, err)
+	// LEFT JOIN with ON city = 'SF': users without matched profile still appear.
+	require.Len(t, users, 3)
+	assert.Equal(t, "Alice", users[0].Name)
+	assert.Equal(t, uint(1), users[0].Profile.ID)
+	assert.Equal(t, uint(0), users[1].Profile.ID)
+	assert.Equal(t, uint(0), users[2].Profile.ID)
+}
+
+func TestQuery_InnerJoins_Association(t *testing.T) {
+	db := openJoinTestDB(t)
+	seedJoinUsers(t, db)
+
+	profile := NewAssociation[joinUser, joinProfile]("Profile")
+
+	var users []joinUser
+	err := New[joinUser]().InnerJoins(profile).Apply(db.Model(&joinUser{})).Order("`join_users`.id asc").Find(&users).Error
+	require.NoError(t, err)
+	// INNER JOIN drops Charlie who has no profile.
+	require.Len(t, users, 2)
+	assert.Equal(t, "Alice", users[0].Name)
+	assert.Equal(t, "Bob", users[1].Name)
+}
+
+func TestQuery_InnerJoins_AssociationWithConds(t *testing.T) {
+	db := openJoinTestDB(t)
+	seedJoinUsers(t, db)
+
+	profile := NewAssociation[joinUser, joinProfile]("Profile")
+	city := NewStringColumn[string]("", "city")
+
+	var users []joinUser
+	err := New[joinUser]().
+		InnerJoins(profile, city.Eq("SF")).
+		Apply(db.Model(&joinUser{})).
+		Find(&users).Error
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	assert.Equal(t, "Alice", users[0].Name)
+}
+
 func TestQuery_Preload_WithoutConds(t *testing.T) {
 	db := openPreloadTestDB(t)
 
