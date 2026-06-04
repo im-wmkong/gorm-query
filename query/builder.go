@@ -22,7 +22,7 @@ type Condition func(db *gorm.DB) *gorm.DB
 // a NEW Builder and leaves the receiver unchanged. Deriving multiple queries
 // from the same base builder is therefore safe without an explicit copy:
 //
-//	base    := query.New[User]().Where(schema.User.Status.Eq(1))
+//	base    := schema.User.Query().Where(schema.User.Status.Eq(1))
 //	adults  := base.Where(schema.User.Age.Gte(18)) // does NOT mutate base
 //	minors  := base.Where(schema.User.Age.Lt(18))  // does NOT mutate base
 //
@@ -34,7 +34,7 @@ type Condition func(db *gorm.DB) *gorm.DB
 //
 // Example:
 //
-//	qb := query.New[User]().Where(
+//	qb := schema.User.Query().Where(
 //	    schema.User.Status.Eq(1),
 //	    schema.User.Age.Gte(18),
 //	).Order(schema.User.CreatedAt.Desc()).Page(1, 20)
@@ -49,23 +49,45 @@ type Builder[T any] struct {
 //
 // Example:
 //
-//	qb := query.New[User]()
+//	qb := schema.User.Query()
 //	_ = qb
 func New[T any]() *Builder[T] {
 	return &Builder[T]{}
 }
 
 // Apply applies all accumulated conditions to the given gorm.DB session.
+//
+// Example:
+//
+//	qb := schema.User.Query().Where(schema.User.Status.Eq(1))
+//	var users []User
+//	_ = qb.Apply(db.Model(&User{})).Find(&users).Error
 func (b *Builder[T]) Apply(db *gorm.DB) *gorm.DB {
 	return gormx.Apply(db, b.conditions)
 }
 
 // Where appends one or more conditions.
+//
+// Example:
+//
+//	qb := schema.User.Query().Where(
+//	    schema.User.Status.Eq(1),
+//	    schema.User.Age.Gte(18),
+//	)
+//	_ = qb
 func (b *Builder[T]) Where(conds ...Condition) *Builder[T] {
 	return b.bind(conds...)
 }
 
 // Or appends nested OR conditions.
+//
+// Example:
+//
+//	qb := schema.User.Query().Where(schema.User.Status.Eq(1)).Or(
+//	    schema.User.Age.Lt(18),
+//	    schema.User.Age.Gt(60),
+//	)
+//	_ = qb
 func (b *Builder[T]) Or(conds ...Condition) *Builder[T] {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
 		return db.Or(nested)
@@ -73,6 +95,13 @@ func (b *Builder[T]) Or(conds ...Condition) *Builder[T] {
 }
 
 // Not appends nested NOT conditions.
+//
+// Example:
+//
+//	qb := schema.User.Query().Not(
+//	    schema.User.Status.Eq(0),
+//	)
+//	_ = qb
 func (b *Builder[T]) Not(conds ...Condition) *Builder[T] {
 	return b.nested(conds, func(db, nested *gorm.DB) *gorm.DB {
 		return db.Not(nested)
@@ -81,6 +110,14 @@ func (b *Builder[T]) Not(conds ...Condition) *Builder[T] {
 
 // Select sets the SELECT clause. Accepts any mixture of typed columns and
 // SQL fragments (Distinct, As, aggregates) because they all satisfy SQLFragment.
+//
+// Example:
+//
+//	qb := schema.User.Query().Select(
+//	    schema.User.ID,
+//	    schema.User.UserName,
+//	)
+//	_ = qb
 func (b *Builder[T]) Select(cols ...SQLFragment) *Builder[T] {
 	if len(cols) == 0 {
 		return b
@@ -92,6 +129,11 @@ func (b *Builder[T]) Select(cols ...SQLFragment) *Builder[T] {
 }
 
 // Omit omits columns.
+//
+// Example:
+//
+//	qb := schema.User.Query().Omit(schema.User.Password)
+//	_ = qb
 func (b *Builder[T]) Omit(cols ...SQLFragment) *Builder[T] {
 	names := SQLFragments(cols).Strings()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -100,6 +142,11 @@ func (b *Builder[T]) Omit(cols ...SQLFragment) *Builder[T] {
 }
 
 // Distinct adds DISTINCT to the query.
+//
+// Example:
+//
+//	qb := schema.User.Query().Distinct(schema.User.Email)
+//	_ = qb
 func (b *Builder[T]) Distinct(cols ...SQLFragment) *Builder[T] {
 	args := SQLFragments(cols).Anys()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -113,8 +160,8 @@ func (b *Builder[T]) Distinct(cols ...SQLFragment) *Builder[T] {
 //
 // Example:
 //
-//	qb := query.New[User]().Preload(schema.User.Profile)
-//	qb = query.New[User]().Preload(
+//	qb := schema.User.Query().Preload(schema.User.Profile)
+//	qb = schema.User.Query().Preload(
 //	    schema.User.Profile.Nested(schema.Profile.Address),
 //	    schema.Address.City.Eq("SF"),
 //	)
@@ -138,8 +185,8 @@ func (b *Builder[T]) Preload(assoc nestable[T], conds ...Condition) *Builder[T] 
 //
 // Example:
 //
-//	qb := query.New[User]().Joins(schema.User.Profile)
-//	qb = query.New[User]().Joins(
+//	qb := schema.User.Query().Joins(schema.User.Profile)
+//	qb = schema.User.Query().Joins(
 //	    schema.User.Profile,
 //	    schema.Profile.City.Eq("SF"),
 //	)
@@ -155,7 +202,7 @@ func (b *Builder[T]) Joins(assoc nestable[T], conds ...Condition) *Builder[T] {
 //
 // Example:
 //
-//	qb := query.New[User]().InnerJoins(schema.User.Profile)
+//	qb := schema.User.Query().InnerJoins(schema.User.Profile)
 //	_ = qb
 func (b *Builder[T]) InnerJoins(assoc nestable[T], conds ...Condition) *Builder[T] {
 	return b.joins(assoc, conds, func(db *gorm.DB, path string, args ...any) *gorm.DB {
@@ -164,6 +211,11 @@ func (b *Builder[T]) InnerJoins(assoc nestable[T], conds ...Condition) *Builder[
 }
 
 // Group adds GROUP BY.
+//
+// Example:
+//
+//	qb := schema.User.Query().Group(schema.User.Status)
+//	_ = qb
 func (b *Builder[T]) Group(col SQLFragment) *Builder[T] {
 	expr := col.SQL()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -172,6 +224,13 @@ func (b *Builder[T]) Group(col SQLFragment) *Builder[T] {
 }
 
 // Having adds HAVING. args are bound to ? placeholders in expr.
+//
+// Example:
+//
+//	qb := schema.User.Query().
+//	    Group(schema.User.Status).
+//	    Having("COUNT(*) > ?", 10)
+//	_ = qb
 func (b *Builder[T]) Having(expr string, args ...any) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Having(expr, args...)
@@ -179,6 +238,11 @@ func (b *Builder[T]) Having(expr string, args ...any) *Builder[T] {
 }
 
 // Order adds ORDER BY.
+//
+// Example:
+//
+//	qb := schema.User.Query().Order(schema.User.CreatedAt.Desc())
+//	_ = qb
 func (b *Builder[T]) Order(col SQLFragment) *Builder[T] {
 	expr := col.SQL()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
@@ -187,6 +251,11 @@ func (b *Builder[T]) Order(col SQLFragment) *Builder[T] {
 }
 
 // Page applies pagination (page starts from 1; pageSize defaults to 10).
+//
+// Example:
+//
+//	qb := schema.User.Query().Page(2, 20)
+//	_ = qb
 func (b *Builder[T]) Page(page, pageSize int) *Builder[T] {
 	if page <= 0 {
 		page = 1
@@ -202,6 +271,11 @@ func (b *Builder[T]) Page(page, pageSize int) *Builder[T] {
 }
 
 // Limit sets LIMIT.
+//
+// Example:
+//
+//	qb := schema.User.Query().Limit(50)
+//	_ = qb
 func (b *Builder[T]) Limit(limit int) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Limit(limit)
@@ -209,6 +283,11 @@ func (b *Builder[T]) Limit(limit int) *Builder[T] {
 }
 
 // Offset sets OFFSET.
+//
+// Example:
+//
+//	qb := schema.User.Query().Offset(100).Limit(20)
+//	_ = qb
 func (b *Builder[T]) Offset(offset int) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Offset(offset)
@@ -216,6 +295,11 @@ func (b *Builder[T]) Offset(offset int) *Builder[T] {
 }
 
 // Unscoped disables default scopes such as soft deletes.
+//
+// Example:
+//
+//	qb := schema.User.Query().Unscoped().Where(schema.User.ID.Eq(1))
+//	_ = qb
 func (b *Builder[T]) Unscoped() *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Unscoped()
@@ -223,6 +307,14 @@ func (b *Builder[T]) Unscoped() *Builder[T] {
 }
 
 // Scope applies one or more GORM scopes.
+//
+// Example:
+//
+//	activeOnly := func(db *gorm.DB) *gorm.DB {
+//	    return db.Where("status = ?", 1)
+//	}
+//	qb := schema.User.Query().Scope(activeOnly)
+//	_ = qb
 func (b *Builder[T]) Scope(funcs ...func(*gorm.DB) *gorm.DB) *Builder[T] {
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Scopes(funcs...)
