@@ -8,14 +8,15 @@
 
 **GORM Query** is a strongly-typed query builder and generic repository library built on top of GORM.
 
-It eliminates fragile "magic strings" in GORM queries through **code generation**, providing a smooth fluent API experience. It also includes generic repositories and context-aware transaction management for cleaner service and data layers.
+It eliminates fragile "magic strings" in GORM queries through **code generation**, providing a smooth fluent API. It also includes generic repositories and context-aware transaction management for cleaner service and data layers.
 
 ## ✨ Core Features
 
-- 🛡️ **Strongly-typed Query Building**: Say goodbye to `db.Where("age > ?", 18)` and embrace `schema.User.Age.Gt(18)`. Catch field name typos at compile time.
-- 📦 **Out-of-the-box Generic Repository**: Use `repo.BaseRepository[T]` to gain full CRUD capabilities with a single line of code.
-- 🎯 **Stop Bloating Repositories**: Combine the universal query builder to compose dynamic queries on the fly—no more writing dozens of `FindByXxx` methods.
-- 🔄 **Implicit Context Transactions**: Pass transactions via `context.Context`. Decouple your Service layer from the Repo layer without passing `*gorm.DB` everywhere.
+- 🛡️ **Strongly-typed Query Building** — say goodbye to `db.Where("age > ?", 18)`, embrace `schema.User.Age.Gt(18)`. Field-name typos fail at compile time.
+- 📦 **Generic Repository** — `repo.BaseRepository[T]` gives you full CRUD in one line.
+- 🎯 **No more bloated repositories** — compose dynamic queries with `query.Builder` instead of writing dozens of `FindByXxx` methods.
+- 🔄 **Implicit context transactions** — pass transactions via `context.Context`. Service and Repository layers stay decoupled from `*gorm.DB`.
+- 🧊 **Immutable, concurrent-safe Builder** — every chained call returns a new Builder; derived queries never share state.
 
 ## 📦 Installation
 
@@ -25,22 +26,18 @@ go get github.com/im-wmkong/gorm-query
 
 ## 🗺️ Capability Map
 
-GORM Query consists of 4 core modules:
-
-| Module | Core Responsibility | Key Capabilities / Methods |
+| Module | Responsibility | Highlights |
 | :--- | :--- | :--- |
-| **`schemagen`** | **Code Generation** | Generates schema definitions like `schema.User` (columns + associations) from GORM models. Supports custom output, package names, and dry-run validation. |
-| **`query`** | **Dynamic Query Builder** | **Builder**: `Where`, `Or`, `Select`, `Preload`, `Page`, `Apply`... <br>**Column**: `Eq`, `Gt`, `Like`, `In`, `Between`, `Sum`, `Asc`... <br>**Association**: `Nested`... |
-| **`repo`** | **Generic Repository** | Provides common CRUD methods: `Create`, `Save`, `Find`, `First`, `Update`, `Delete`, `Pluck`... |
-| **`db`** | **Context Transaction** | `db.Client` implements both `DBProvider` and `Transactor`. Repositories automatically reuse the same transaction via `ctx`. |
+| **`schemagen`** | Code generation | Parses GORM models into typed schema dictionaries (columns + associations). Options: `WithOutputDir`, `WithPackageName`, `WithNamingStrategy`, `WithDryRun`, `WithLogger`. |
+| **`query`** | Dynamic query builder | **Builder**: `Where / Or / Not / Select / Omit / Distinct / Preload / Joins / InnerJoins / Group / Having / Order / Page / Limit / Offset / Unscoped / Scope / Apply` <br>**Column**: `Eq / Neq / Gt / Gte / Lt / Lte / In / NotIn / Between / NotBetween / Like / Contains / HasPrefix / HasSuffix / IsNull / IsNotNull / Sum / Count / Avg / Max / Min / As / Distinct / Set / Asc / Desc / WithTable` <br>**Association**: `Preload / Joins / Nested` |
+| **`repo`** | Generic repository | `Save / Create / CreateInBatches / Update / Delete / Find / First / Take / Last / Count / Exists / Pluck / DB(ctx)` |
+| **`db`** | Context transactions | `Client` implements `DBProvider` + `Transactor`; transactions flow through `context.Context`. |
 
-**Best Path to Start:** `schemagen` generation ➔ `schema.Xxx` definitions ➔ `query` builder ➔ `repo` execution.
+→ Full API reference on [pkg.go.dev](https://pkg.go.dev/github.com/im-wmkong/gorm-query). Module deep-dives live in [`docs/`](docs/README.md).
 
 ## 🚀 Quick Start
 
-### 1. Define Your Model
-
-Define your GORM model as usual:
+### 1. Define your model
 
 ```go
 package model
@@ -56,9 +53,9 @@ type User struct {
 }
 ```
 
-### 2. Configure and Run Code Generation
+### 2. Generate the schema
 
-Create a simple generation script (e.g., at `cmd/gen/main.go`) and pass the models you want to generate schema for:
+Create a tiny generation script (e.g. `cmd/gen/main.go`):
 
 ```go
 package main
@@ -66,147 +63,165 @@ package main
 import (
     "log"
 
-    "your_project_name/model" // Replace with your actual project path
+    "your_project_name/model"
     "github.com/im-wmkong/gorm-query/schemagen"
 )
 
 func main() {
-    // Initialize the generator and provide your models
-    err := schemagen.New().Generate(&model.User{})
-
-    if err != nil {
+    if err := schemagen.New().Generate(&model.User{}); err != nil {
         log.Fatalf("generate failed: %v", err)
     }
 }
 ```
 
-Run the script from your terminal:
-
 ```bash
 go run cmd/gen/main.go
 ```
-*This will automatically create a code file (e.g., `model/schema/user_gen.go`) containing the generated `schema.User` variable.*
 
-By default, `schemagen` writes generated schema into a dedicated `schema` package.
+This emits `model/schema/user_gen.go` with a `schema.User` variable.
 
-> **💡 Pro Tip:** You can add `//go:generate go run cmd/gen/main.go` to the top of any Go file and trigger generation using `go generate ./...` in your standard workflow.
+> **💡 Pro tip**: add `//go:generate go run cmd/gen/main.go` to a Go file and trigger generation via `go generate ./...`.
 
-### 3. Enjoy Smooth Strongly-typed Queries
+→ See [docs/en/schemagen.md](docs/en/schemagen.md) for all options, naming rules, and limitations.
 
-Now you can use the generated `schema.User` with the Query Builder for type-safe queries:
+### 3. Build type-safe queries
 
 ```go
 import (
-    "gorm.io/gorm"
-
-    "your_project_name/model/schema"
     "your_project_name/model"
+    "your_project_name/model/schema"
 )
 
-var db *gorm.DB
-
-// 1. Build queries fluently
 qb := schema.User.Query().
     Where(
         schema.User.Age.Gte(18),
         schema.User.UserName.Contains("wmkong"),
     ).
-    Page(1, 20).
-    Order(schema.User.ID.Desc())
+    Order(schema.User.CreatedAt.Desc()).
+    Page(1, 20)
 
-// 2. Apply to gorm.DB
+// Apply onto *gorm.DB...
 var users []model.User
-err := qb.Apply(db).Find(&users).Error
+err := qb.Apply(db.Model(&model.User{})).Find(&users).Error
 ```
 
-## 💡 Advanced Usage
+→ Full operator reference: [docs/en/query-builder.md](docs/en/query-builder.md).
 
-### 1. Generic Repository & Context-Aware Transactions
+### 4. Or hand the Builder to a Repository
 
-`db.Client` is the glue between your Service and Repository layers:
+```go
+client := db.NewClient(gormDB)
+users  := repo.New[model.User](client)
 
-- `db.Client` implements both `db.DBProvider` and `db.Transactor`
-- Repositories depend only on `db.DBProvider`
-- Services depend only on `db.Transactor`
-- The active transaction flows through `context.Context`, so you never need to pass `*gorm.DB` around manually
+list, err := users.Find(ctx,
+    schema.User.Query().Where(schema.User.Status.Eq(1)),
+)
+```
 
-For brevity, the example below accepts `*db.Client` directly, since it already implements both interfaces.
+→ All repository methods in [docs/en/repository.md](docs/en/repository.md).
 
-**Define a Service with Generic Repositories:**
+## 💡 Patterns at a glance
+
+### Context-aware transactions
+
 ```go
 type UserService struct {
-    users    repo.Repository[model.User]
-    profiles repo.Repository[model.Profile]
-    tx       db.Transactor
+    users repo.Repository[model.User]
+    tx    db.Transactor
 }
 
-func NewUserService(dbClient *db.Client) *UserService {
-    return &UserService{
-        users:    repo.New[model.User](dbClient),
-        profiles: repo.New[model.Profile](dbClient),
-        tx:       dbClient,
-    }
-}
-```
-
-**Wrap Business Logic in One Transaction:**
-```go
-// The service coordinates the transaction once.
-// Repositories automatically pick it up from txCtx.
-func (s *UserService) CreateUserAndProfile(ctx context.Context, user *model.User, profile *model.Profile) error {
+func (s *UserService) Register(ctx context.Context, u *model.User, p *model.Profile) error {
     return s.tx.Transaction(ctx, func(txCtx context.Context) error {
-        if err := s.users.Create(txCtx, user); err != nil {
+        if err := s.users.Create(txCtx, u); err != nil {
             return err
         }
-
-        profile.UserID = user.ID
-        if err := s.profiles.Create(txCtx, profile); err != nil {
-            return err
-        }
-
-        return nil
+        p.UserID = u.ID
+        return s.profiles.Create(txCtx, p)
     })
 }
 ```
 
-Both repository calls receive the same `txCtx`, so they run inside the same transaction automatically. If any step returns an error, GORM rolls everything back for you.
+→ Propagation contract, nested transactions, cancellation: [docs/en/transaction.md](docs/en/transaction.md).
 
-When you need custom repository methods later, you can still wrap `repo.New[T](dbClient)` inside your own repository types without changing this transaction model.
-
-### 2. Dynamic Repository Queries
-
-Stop inflating your Repository interfaces with dozens of specific methods like `FindByNameAndAge`. Use the `query.Builder` to handle dynamic conditions in the Service layer while keeping your Repository clean.
-
-Once your service already depends on a generic repository, `query.Builder` becomes the missing piece for dynamic filtering.
+### Dynamic queries without bloating Repositories
 
 ```go
 func (s *UserService) GetUsers(ctx context.Context, name string, minAge int) ([]*model.User, error) {
-    // 1. Build dynamic conditions
     qb := schema.User.Query().Where(schema.User.Status.Eq(1))
-
     if name != "" {
         qb = qb.Where(schema.User.UserName.Contains(name))
     }
     if minAge > 0 {
         qb = qb.Where(schema.User.Age.Gte(minAge))
     }
-
-    // 2. Pass the builder directly to the generic Find method
     return s.users.Find(ctx, qb)
 }
 ```
 
+### Updates with type-safe assignments
+
+```go
+qb := schema.User.Query().Where(schema.User.ID.Eq(1))
+rows, err := s.users.Update(ctx, qb,
+    schema.User.Status.Set(2),
+    schema.User.Email.Set("a@b.com"),
+)
+```
+
+### Preload + nested associations
+
+```go
+schema.User.Query().Preload(
+    schema.User.Profile.Nested(schema.Profile.Address),
+    schema.Address.City.Eq("SF"),
+)
+```
+
+### Escape hatches
+
+```go
+// Builder: inject raw GORM logic
+qb.Scope(func(db *gorm.DB) *gorm.DB { return db.Where("status = ?", 1) })
+
+// Repository: grab the transaction-aware *gorm.DB
+err := r.DB(ctx).
+    Clauses(clause.OnConflict{DoNothing: true}).
+    Create(&u).Error
+```
+
+## 📚 Documentation
+
+A full runnable demo (SQLite + schemagen + repository + service + tests) lives in [`example/`](example).
+
+| Topic | Doc |
+| :--- | :--- |
+| Query Builder API | [docs/en/query-builder.md](docs/en/query-builder.md) |
+| Repository methods | [docs/en/repository.md](docs/en/repository.md) |
+| Transaction model | [docs/en/transaction.md](docs/en/transaction.md) |
+| Code generator | [docs/en/schemagen.md](docs/en/schemagen.md) |
+| FAQ & pitfalls | [docs/en/faq.md](docs/en/faq.md) |
+
+→ Index for both English and Chinese: [docs/README.md](docs/README.md).
+
+## 🚧 Known limitations
+
+- No type-safe subqueries / `EXISTS` / `IN (SELECT ...)`.
+- No typed `OnConflict` / `Upsert` / `Returning` / `FOR UPDATE`.
+- `Having(...)` and `RawFragment` are still string-based — drop into `repo.DB(ctx)` when needed.
+- Integration tests cover SQLite only; verify MySQL / Postgres specifics yourself.
+
 ## 🤝 Contributing
 
-Issues and Pull Requests are welcome!
+Issues and PRs welcome. Before submitting:
 
-Before submitting, please run:
 ```bash
 make tidy
 make generate
 make test
 ```
 
+> When you change `README.md`, please keep `README_CN.md` in sync (and vice versa).
+
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT License](LICENSE).
