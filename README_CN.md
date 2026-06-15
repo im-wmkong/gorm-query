@@ -206,7 +206,6 @@ err := r.DB(ctx).
 - 暂不支持类型安全的子查询 / `EXISTS` / `IN (SELECT ...)`。
 - 暂不支持类型安全的 `OnConflict` / `Upsert` / `Returning` / `FOR UPDATE`。
 - `Having(...)` 与 `RawFragment` 仍是字符串，必要时请走 `repo.DB(ctx)` 兜底。
-- 集成测试仅覆盖 SQLite，MySQL / Postgres 方言相关请自行验证。
 
 ## 🤝 参与贡献
 
