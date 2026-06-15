@@ -22,7 +22,7 @@ users := repo.New[model.User](client)
 | `Save(ctx, entity)` | upsert：依据主键决定 INSERT 或 UPDATE |
 | `Create(ctx, entity)` | 仅 INSERT |
 | `CreateInBatches(ctx, entities, batchSize) (int64, error)` | 分批插入，返回实际写入行数 |
-| `Update(ctx, qb, assigns...) (int64, error)` | 按 Builder 条件更新；`len(assigns) == 0` 时返回 `(0, nil)` |
+| `Update(ctx, qb, assigns...) (int64, error)` | 按 Builder 条件更新；`len(assigns) == 0` 时返回 `(0, query.ErrNoAssignment)` |
 | `Delete(ctx, qb) (int64, error)` | 按 Builder 条件删除 |
 | `Find(ctx, qb) ([]*T, error)` | 列表查询 |
 | `First(ctx, qb) (*T, error)` | 主键升序第一条；未命中返回 `(nil, gorm.ErrRecordNotFound)` |

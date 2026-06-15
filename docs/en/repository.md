@@ -22,7 +22,7 @@ users := repo.New[model.User](client)
 | `Save(ctx, entity)` | Upsert based on the primary key. |
 | `Create(ctx, entity)` | INSERT only. |
 | `CreateInBatches(ctx, entities, batchSize) (int64, error)` | Batched INSERT, returns rows affected. |
-| `Update(ctx, qb, assigns...) (int64, error)` | UPDATE matched rows; `len(assigns) == 0` returns `(0, nil)`. |
+| `Update(ctx, qb, assigns...) (int64, error)` | UPDATE matched rows; `len(assigns) == 0` returns `(0, query.ErrNoAssignment)`. |
 | `Delete(ctx, qb) (int64, error)` | DELETE matched rows. |
 | `Find(ctx, qb) ([]*T, error)` | List query. |
 | `First(ctx, qb) (*T, error)` | First by PK; not found → `(nil, gorm.ErrRecordNotFound)`. |

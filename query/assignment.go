@@ -1,6 +1,15 @@
 package query
 
-import "github.com/im-wmkong/gorm-query/internal/slicex"
+import (
+	"errors"
+
+	"github.com/im-wmkong/gorm-query/internal/slicex"
+)
+
+// ErrNoAssignment is returned by update operations when no assignment is
+// provided. An empty assignment list is treated as a programming error rather
+// than a silent no-op, so callers can catch it with errors.Is.
+var ErrNoAssignment = errors.New("query: no assignment provided")
 
 // Assignment represents a single "<column> = value" pair for update statements.
 // It is produced by a typed column's Set method, so the value type is checked

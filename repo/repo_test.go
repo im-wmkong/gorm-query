@@ -123,6 +123,10 @@ func TestBaseRepository_Update(t *testing.T) {
 	assert.Equal(t, 31, bob.Age)
 	assert.Equal(t, 2, bob.Status)
 	assert.Equal(t, "bob2@example.com", bob.Email)
+
+	rows, err = r.Update(ctx, query.New[user]().Where(userSchema.UserName.Eq("Bob")))
+	assert.ErrorIs(t, err, query.ErrNoAssignment)
+	assert.Equal(t, int64(0), rows)
 }
 
 func TestBaseRepository_CreateInBatches(t *testing.T) {

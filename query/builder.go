@@ -56,6 +56,8 @@ func New[T any]() *Builder[T] {
 }
 
 // Apply applies all accumulated conditions to the given gorm.DB session.
+// It runs against an independent session so the passed-in db is left untouched,
+// keeping repeated Apply calls on the same base mutually isolated.
 //
 // Example:
 //
@@ -63,7 +65,7 @@ func New[T any]() *Builder[T] {
 //	var users []User
 //	_ = qb.Apply(db.Model(&User{})).Find(&users).Error
 func (b *Builder[T]) Apply(db *gorm.DB) *gorm.DB {
-	return gormx.Apply(db, b.conditions)
+	return gormx.Apply(db.Session(&gorm.Session{}), b.conditions)
 }
 
 // Where appends one or more conditions.

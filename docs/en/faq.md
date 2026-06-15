@@ -1,8 +1,8 @@
 # FAQ & pitfalls
 
-## 1. Why doesn't `Update` with empty assigns return an error?
+## 1. What happens when `Update` is called with empty assigns?
 
-`BaseRepository.Update` explicitly returns `(0, nil)` when `len(assigns) == 0`. This is a contractual no-op that prevents the GORM trap of "empty map → full-table update". Always use `Set(...)` to express the intended change.
+`BaseRepository.Update` returns `(0, query.ErrNoAssignment)` when `len(assigns) == 0`. An empty assignment list is treated as a programming error rather than a silent no-op: it surfaces caller bugs early and prevents the GORM trap of "empty map → full-table update". Always use `Set(...)` to express the intended change, and check it with `errors.Is(err, query.ErrNoAssignment)`.
 
 ## 2. Why does my Builder reference not change after chaining?
 

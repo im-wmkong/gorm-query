@@ -1,8 +1,8 @@
 # FAQ 与常见陷阱
 
-## 1. 为什么 `Update` 传空 assigns 不报错？
+## 1. `Update` 传空 assigns 会怎样？
 
-`BaseRepository.Update` 在 `len(assigns) == 0` 时显式返回 `(0, nil)`，是契约性 no-op，避免误触发"GORM 收到空 map → 全表更新"。需要变更时请总是显式 `Set(...)`。
+`BaseRepository.Update` 在 `len(assigns) == 0` 时返回 `(0, query.ErrNoAssignment)`。空 assigns 被视为编程错误（而非静默 no-op），既能尽早暴露调用方 bug，也避免误触发"GORM 收到空 map → 全表更新"。需要变更时请总是显式 `Set(...)`，可用 `errors.Is(err, query.ErrNoAssignment)` 判定。
 
 ## 2. 为什么 Builder 链式后原对象没变？
 

@@ -777,3 +777,29 @@ func TestBuilder_NoSharedBackingArray(t *testing.T) {
 	require.Len(t, users, 1)
 	assert.Equal(t, "Bob", users[0].UserName)
 }
+
+// TestBuilder_ApplyDoesNotMutateBase guards against the side effect where Apply
+// appends clauses onto the passed-in *gorm.DB. Two Apply calls sharing the same
+// base session must stay isolated: the first derivation's conditions must not
+// leak into the second.
+func TestBuilder_ApplyDoesNotMutateBase(t *testing.T) {
+	db := openTestDB(t)
+	seedUsers(t, db)
+
+	base := db.Model(&user{})
+
+	alice := New[user]().Where(userSchema.UserName.Eq("Alice"))
+	bob := New[user]().Where(userSchema.UserName.Eq("Bob"))
+
+	var aliceUsers []user
+	require.NoError(t, alice.Apply(base).Find(&aliceUsers).Error)
+	require.Len(t, aliceUsers, 1)
+	assert.Equal(t, "Alice", aliceUsers[0].UserName)
+
+	// If Apply mutated base, this query would carry user_name = "Alice" too
+	// and return zero rows.
+	var bobUsers []user
+	require.NoError(t, bob.Apply(base).Find(&bobUsers).Error)
+	require.Len(t, bobUsers, 1)
+	assert.Equal(t, "Bob", bobUsers[0].UserName)
+}

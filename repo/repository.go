@@ -102,7 +102,7 @@ func (r *BaseRepository[T]) CreateInBatches(ctx context.Context, entities []*T, 
 }
 
 // Update updates one or more columns for matched records.
-// When no assignment is given, it is a no-op and returns (0, nil).
+// When no assignment is given, it returns (0, query.ErrNoAssignment).
 //
 // Example:
 //
@@ -114,7 +114,7 @@ func (r *BaseRepository[T]) CreateInBatches(ctx context.Context, entities []*T, 
 //	_, _ = rows, err
 func (r *BaseRepository[T]) Update(ctx context.Context, qb *query.Builder[T], assigns ...query.Assignment) (int64, error) {
 	if len(assigns) == 0 {
-		return 0, nil
+		return 0, query.ErrNoAssignment
 	}
 	values := query.Assignments(assigns).ToMap()
 	result := r.buildQuery(ctx, qb).Updates(values)
