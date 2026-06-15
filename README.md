@@ -208,7 +208,6 @@ A full runnable demo (SQLite + schemagen + repository + service + tests) lives i
 - No type-safe subqueries / `EXISTS` / `IN (SELECT ...)`.
 - No typed `OnConflict` / `Upsert` / `Returning` / `FOR UPDATE`.
 - `Having(...)` and `RawFragment` are still string-based — drop into `repo.DB(ctx)` when needed.
-- Integration tests cover SQLite only; verify MySQL / Postgres specifics yourself.
 
 ## 🤝 Contributing
 
