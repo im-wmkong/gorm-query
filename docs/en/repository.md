@@ -147,3 +147,9 @@ err := r.DB(ctx).
 ```
 
 It still picks up any active transaction from `ctx`.
+
+## Query composition compatibility
+
+Count and Exists preserve the Builder's Offset. Count a base Builder and derive a paginated Builder separately when both total count and page data are needed. Empty IN and NOT IN currently both return no rows. Multiple Or arguments form an AND group which is then ORed with the preceding conditions.
+
+Select/Omit also restrict Update fields: Select(Age) followed by assignments to Age and Email updates only Age; Omit(Age) preserves Age. Zero values are still written. Pluck preserves GORM precedence: an existing single-column Select takes precedence over the Pluck column argument.

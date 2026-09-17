@@ -1,6 +1,7 @@
 package query
 
 import (
+	"slices"
 	"time"
 
 	"gorm.io/gorm"
@@ -197,6 +198,12 @@ func NewValueColumn[T any](table, name string) ValueColumn[T] {
 	return ValueColumn[T]{baseColumn: baseColumn{table: table, name: name}}
 }
 
+// WithTable returns a qualified copy preserving the column type.
+func (c ValueColumn[T]) WithTable(table string) ValueColumn[T] {
+	c.baseColumn = c.baseColumn.WithTable(table)
+	return c
+}
+
 // Eq builds "<col> = ?".
 //
 // Example:
@@ -224,7 +231,7 @@ func (c ValueColumn[T]) Neq(v T) Condition {
 //	qb := schema.User.Query().Where(schema.User.Status.In([]int{1, 2, 3}))
 //	_ = qb
 func (c ValueColumn[T]) In(vs []T) Condition {
-	return c.compare("IN", vs)
+	return c.compare("IN", slices.Clone(vs))
 }
 
 // NotIn builds "<col> NOT IN ?".
@@ -234,7 +241,7 @@ func (c ValueColumn[T]) In(vs []T) Condition {
 //	qb := schema.User.Query().Where(schema.User.Status.NotIn([]int{0, 99}))
 //	_ = qb
 func (c ValueColumn[T]) NotIn(vs []T) Condition {
-	return c.compare("NOT IN", vs)
+	return c.compare("NOT IN", slices.Clone(vs))
 }
 
 // Set produces an assignment "<col> = v" for Repository.Updates.
@@ -335,6 +342,12 @@ func NewStringColumn[T ~string](table, name string) StringColumn[T] {
 	return StringColumn[T]{orderable: orderable[T]{ValueColumn: NewValueColumn[T](table, name)}}
 }
 
+// WithTable returns a qualified copy preserving the column type.
+func (c StringColumn[T]) WithTable(table string) StringColumn[T] {
+	c.baseColumn = c.baseColumn.WithTable(table)
+	return c
+}
+
 // Like builds "<col> LIKE ?".
 //
 // Example:
@@ -411,6 +424,12 @@ func NewNumericColumn[T Numeric](table, name string) NumericColumn[T] {
 	return NumericColumn[T]{orderable: orderable[T]{ValueColumn: NewValueColumn[T](table, name)}}
 }
 
+// WithTable returns a qualified copy preserving the column type.
+func (c NumericColumn[T]) WithTable(table string) NumericColumn[T] {
+	c.baseColumn = c.baseColumn.WithTable(table)
+	return c
+}
+
 // TimeColumn is a typed column for time.Time values.
 // Ordered comparisons + Between / NotBetween come from the embedded orderable.
 type TimeColumn struct {
@@ -427,6 +446,12 @@ func NewTimeColumn(table, name string) TimeColumn {
 	return TimeColumn{orderable: orderable[time.Time]{ValueColumn: NewValueColumn[time.Time](table, name)}}
 }
 
+// WithTable returns a qualified copy preserving the column type.
+func (c TimeColumn) WithTable(table string) TimeColumn {
+	c.baseColumn = c.baseColumn.WithTable(table)
+	return c
+}
+
 // BoolColumn is a typed column for boolean values.
 type BoolColumn struct {
 	ValueColumn[bool]
@@ -440,6 +465,12 @@ type BoolColumn struct {
 //	_ = col
 func NewBoolColumn(table, name string) BoolColumn {
 	return BoolColumn{ValueColumn: NewValueColumn[bool](table, name)}
+}
+
+// WithTable returns a qualified copy preserving the column type.
+func (c BoolColumn) WithTable(table string) BoolColumn {
+	c.baseColumn = c.baseColumn.WithTable(table)
+	return c
 }
 
 // IsTrue is a semantic alias for Eq(true).

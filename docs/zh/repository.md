@@ -147,3 +147,9 @@ err := r.DB(ctx).
 ```
 
 仍然会自动复用 ctx 中的事务连接。
+
+## 查询组合的兼容语义
+
+Count 和 Exists 保留 Builder 的 Offset；要同时取得总数和分页数据，用基础 Builder 计数，再由它派生分页查询。空 IN 和空 NOT IN 当前都不返回记录；Or 的多个参数在括号内以 AND 组合，再与已有条件 OR。
+
+Select/Omit 同时决定 Update 的字段集合。例如 Select(Age) 后更新 Age 和 Email，只会更新 Age；Omit(Age) 则保留 Age。零值赋值依然写入。Pluck 延续 GORM 的优先级：已有单列 Select 优先于 Pluck 的列参数。

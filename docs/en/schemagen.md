@@ -29,7 +29,7 @@ go run cmd/gen/main.go
 Defaults:
 - output dir: `./schema`
 - package name: inferred from the output dir (`schema` → `package schema`)
-- naming strategy: `schema.NamingStrategy{SingularTable: true}`
+- naming strategy: `schema.NamingStrategy{}`
 - file name: `User` model → `user_gen.go`
 
 ## 2. Integrating with `go generate`
@@ -51,7 +51,7 @@ Defined in `schemagen/options.go`:
 | :--- | :--- | :--- |
 | `WithOutputDir(dir)` | Output directory | `"schema"` |
 | `WithPackageName(name)` | Explicit package name | inferred from output dir |
-| `WithNamingStrategy(ns)` | GORM naming strategy | `{SingularTable: true}` |
+| `WithNamingStrategy(ns)` | GORM naming strategy | `{}` |
 | `WithDryRun(true)` | Verify mode: do not write files; check existing files match the new content | `false` |
 | `WithLogger(logger)` | Custom logger; `nil` becomes `NopLogger()` | `DefaultLogger()` |
 
@@ -87,11 +87,11 @@ GORM associations (`HasOne` / `HasMany` / `BelongsTo` / `Many2Many`) become `que
 
 ## 6. Limitations & gotchas
 
-- **Single-package requirement**: every model passed in one `Generate(...)` call must live in the same Go package, otherwise you'll see `all models must be in the same package`.
+- **Single-package requirement**: every model passed in one `Generate(...)` call must live at the same complete Go import path, otherwise you'll see `all models must be in the same package`.
 - **Anonymous / unexported types**: skipped with a warning.
 - **Empty `DBName`**: fields whose GORM `DBName` is empty (typically explicit `gorm:"-"`) are skipped.
-- **Package-name consistency**: if `outputDir` already contains Go files whose package differs from the target, generation fails. Set `WithPackageName(...)` explicitly to force it.
-- **Dry-run**: byte-level comparison against existing files; useful in CI to detect a missed regeneration.
+- **Package-name consistency**: if `outputDir` already contains Go files whose package differs from the target, generation fails. `WithPackageName(...)` must match the existing package; it does not override a conflict.
+- **Dry-run**: byte-level comparison against existing files, without creating directories or files; useful in CI to detect a missed regeneration.
 
 ## 7. Generated output example
 
@@ -125,3 +125,11 @@ func (s *user) Query() *query.Builder[model.User] {
 ```
 
 Full runnable example: [`example/cmd/schemagen/main.go`](../../example/cmd/schemagen/main.go) and [`example/model/schema/`](../../example/model/schema/).
+
+## 8. Naming and generation validation
+
+The default matches GORM plural table naming. For singular table names, configure `WithNamingStrategy(schema.NamingStrategy{SingularTable: true})`. Generation and runtime naming strategies must agree; model `TableName()` overrides take precedence.
+
+Unambiguous fields retain their names. Conflicting embedded fields gain progressively longer field paths: `Billing.City` and `Shipping.City` become `BillingCity` and `ShippingCity`. Database names remain GORM DBName values. Unresolvable collisions return an error identifying the model and field paths.
+
+The generator validates complete package identities, output filenames, generated identifiers and member names, then renders all files before writing. Detectable validation errors preserve existing files. Disk failures during writes do not provide atomic rollback across multiple files.

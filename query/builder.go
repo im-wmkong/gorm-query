@@ -1,13 +1,15 @@
 // Package query provides the core of a type-safe GORM query builder.
 //
 // It builds queries dynamically via the functional Condition pattern. Builders
-// are immutable: every chained method returns a new Builder, so derived
-// queries never share state with their base. It is typically used together
+// are immutable: chained methods leave the receiver unchanged; no-op calls
+// may return the receiver. It is typically used together
 // with the generated schema (e.g. schema.User) to provide a smooth, type-safe,
 // chainable SQL building experience.
 package query
 
 import (
+	"slices"
+
 	"github.com/im-wmkong/gorm-query/internal/gormx"
 	"gorm.io/gorm"
 )
@@ -18,16 +20,17 @@ type Condition func(db *gorm.DB) *gorm.DB
 
 // Builder accumulates query conditions for a specific entity type T.
 //
-// Builder is immutable: every chained method (Where, Or, Select, ...) returns
-// a NEW Builder and leaves the receiver unchanged. Deriving multiple queries
-// from the same base builder is therefore safe without an explicit copy:
+// Builder is immutable: chained methods (Where, Or, Select, ...) leave the
+// receiver unchanged; no-op calls may return it. Deriving multiple queries
+// from the same base builder does not require an explicit copy:
 //
 //	base    := schema.User.Query().Where(schema.User.Status.Eq(1))
 //	adults  := base.Where(schema.User.Age.Gte(18)) // does NOT mutate base
 //	minors  := base.Where(schema.User.Age.Lt(18))  // does NOT mutate base
 //
-// Because the receiver is never mutated, a Builder is also safe to be read
-// concurrently from multiple goroutines once it is fully constructed.
+// A constructed Builder can be reused concurrently when its Conditions and
+// Scopes are safe for concurrent calls. Input slices are shallow-copied;
+// callers must synchronize mutations to referenced values and captured state.
 //
 // The type parameter T ties Preload to associations whose Parent is T, so that
 // schema.Order.Items cannot be preloaded through a Builder[User].
@@ -169,6 +172,7 @@ func (b *Builder[T]) Distinct(cols ...SQLFragment) *Builder[T] {
 //	)
 //	_ = qb
 func (b *Builder[T]) Preload(assoc nestable[T], conds ...Condition) *Builder[T] {
+	conds = slices.Clone(conds)
 	path := assoc.Path()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		if len(conds) == 0 {
@@ -183,14 +187,15 @@ func (b *Builder[T]) Preload(assoc nestable[T], conds ...Condition) *Builder[T] 
 // Joins performs a LEFT JOIN on the given association. The association's
 // Parent must be T; the compiler rejects Joins(schema.Order.Items) on a
 // Builder[User]. Extra conditions (if provided) are applied to the join's
-// ON clause as a nested scope.
+// ON clause as a nested scope. Qualify target columns with the association's
+// GORM alias via WithTable.
 //
 // Example:
 //
 //	qb := schema.User.Query().Joins(schema.User.Profile)
 //	qb = schema.User.Query().Joins(
 //	    schema.User.Profile,
-//	    schema.Profile.City.Eq("SF"),
+//	    schema.Profile.Bio.WithTable("Profile").Eq("SF"),
 //	)
 //	_ = qb
 func (b *Builder[T]) Joins(assoc nestable[T], conds ...Condition) *Builder[T] {
@@ -234,6 +239,7 @@ func (b *Builder[T]) Group(col SQLFragment) *Builder[T] {
 //	    Having("COUNT(*) > ?", 10)
 //	_ = qb
 func (b *Builder[T]) Having(expr string, args ...any) *Builder[T] {
+	args = slices.Clone(args)
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Having(expr, args...)
 	})
@@ -318,12 +324,14 @@ func (b *Builder[T]) Unscoped() *Builder[T] {
 //	qb := schema.User.Query().Scope(activeOnly)
 //	_ = qb
 func (b *Builder[T]) Scope(funcs ...func(*gorm.DB) *gorm.DB) *Builder[T] {
+	funcs = slices.Clone(funcs)
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		return db.Scopes(funcs...)
 	})
 }
 
 func (b *Builder[T]) joins(assoc nestable[T], conds []Condition, applier func(db *gorm.DB, path string, args ...any) *gorm.DB) *Builder[T] {
+	conds = slices.Clone(conds)
 	path := assoc.Path()
 	return b.bind(func(db *gorm.DB) *gorm.DB {
 		if len(conds) == 0 {
@@ -334,6 +342,7 @@ func (b *Builder[T]) joins(assoc nestable[T], conds []Condition, applier func(db
 }
 
 func (b *Builder[T]) nested(conds []Condition, applier func(db, nested *gorm.DB) *gorm.DB) *Builder[T] {
+	conds = slices.Clone(conds)
 	if len(conds) == 0 {
 		return b
 	}

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -16,17 +16,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.22', '1.23']
+        go: ['1.21', '1.22', '1.23']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
           cache: true
+      - name: Prepare dependencies
+        run: go mod download
+      - name: Verify generated sources
+        run: make check-generated
       - name: go vet
         run: go vet ./...
       - name: go test
-        run: go test -race -count=1 ./...
+        run: make test
+      - name: Repeat public contracts
+        if: matrix.go == '1.23'
+        run: make test-contract
+      # Consumer subprocess execution is not included in this coverage profile.
+      - name: Coverage observation (parent test processes)
+        if: matrix.go == '1.23'
+        run: go test -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+      - uses: actions/upload-artifact@v4
+        if: matrix.go == '1.23'
+        with:
+          name: coverage
+          path: coverage.out
+          if-no-files-found: error
 
   lint:
     name: golangci-lint
@@ -39,5 +56,5 @@ jobs:
           cache: true
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.61.0
+          version: v1.62.2
           args: --timeout=5m

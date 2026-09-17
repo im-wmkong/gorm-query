@@ -16,7 +16,7 @@ It eliminates fragile "magic strings" in GORM queries through **code generation*
 - 📦 **Generic Repository** — `repo.BaseRepository[T]` gives you full CRUD in one line.
 - 🎯 **No more bloated repositories** — compose dynamic queries with `query.Builder` instead of writing dozens of `FindByXxx` methods.
 - 🔄 **Implicit context transactions** — pass transactions via `context.Context`. Service and Repository layers stay decoupled from `*gorm.DB`.
-- 🧊 **Immutable, concurrent-safe Builder** — every chained call returns a new Builder; derived queries never share state.
+- 🧊 **Immutable Builder** — chained calls leave the receiver unchanged; no-op calls may return it. See [concurrent reuse requirements](docs/en/query-builder.md).
 
 ## 📦 Installation
 
@@ -218,6 +218,8 @@ make tidy
 make generate
 make test
 ```
+
+`make test` enables race detection, including the generated consumer tests run in subprocesses. `make test-contract` repeats the public API composition tests in shuffled order. CI's `coverage.out` reports parent test process coverage only; it does not aggregate consumer subprocess execution and has no minimum percentage gate.
 
 > When you change `README.md`, please keep `README_CN.md` in sync (and vice versa).
 

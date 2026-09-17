@@ -1,0 +1,87 @@
+package consumer
+
+import (
+	"context"
+	"testing"
+
+	generated "example.com/consumer/schema"
+	"github.com/im-wmkong/gorm-query/db"
+	"github.com/im-wmkong/gorm-query/query"
+	"github.com/im-wmkong/gorm-query/repo"
+	"github.com/im-wmkong/gorm-query/test/model"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
+)
+
+func TestGeneratedQuery(t *testing.T) {
+	d, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{NamingStrategy: NAMING_STRATEGY})
+	require.NoError(t, err)
+	sqlDB, err := d.DB()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+	require.NoError(t, d.AutoMigrate(&model.Reserved{}))
+	require.NoError(t, d.Create(&[]model.Reserved{{Value: 2}, {Value: 3}}).Error)
+	var control []model.Reserved
+	require.NoError(t, d.Where(clause.Eq{Column: clause.Column{Table: "order", Name: "select"}, Value: 2}).Find(&control).Error)
+	require.Len(t, control, 1)
+	// SQLFragment keeps raw SQL semantics. Use Scope for dialect-aware
+	// projection, ordering and aggregate expressions.
+	column := clause.Column{Table: generated.Reserved.Value.Table(), Name: generated.Reserved.Value.Name()}
+	cases := []struct {
+		name string
+		qb   *query.Builder[model.Reserved]
+		want []int
+	}{
+		{"where_scope", generated.Reserved.Query().Scope(func(tx *gorm.DB) *gorm.DB {
+			return tx.Where(clause.Eq{Column: column, Value: 2})
+		}), []int{2}},
+		{"order_scope", generated.Reserved.Query().Scope(func(tx *gorm.DB) *gorm.DB {
+			return tx.Order(clause.OrderByColumn{Column: column, Desc: true})
+		}), []int{3, 2}},
+		{"select_scope", generated.Reserved.Query().Scope(func(tx *gorm.DB) *gorm.DB {
+			return tx.Select("?", column)
+		}).Order(query.RawFragment("id ASC")), []int{2, 3}},
+		{"group", generated.Reserved.Query().Group(generated.Reserved.Value).Order(query.RawFragment("id ASC")), []int{2, 3}},
+		{"distinct_scope", generated.Reserved.Query().Scope(func(tx *gorm.DB) *gorm.DB {
+			return tx.Distinct(column.Name)
+		}).Order(query.RawFragment("id ASC")), []int{2, 3}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var out []model.Reserved
+			require.NoError(t, tc.qb.Apply(d.Model(&model.Reserved{})).Find(&out).Error)
+			values := make([]int, len(out))
+			for i, row := range out {
+				values[i] = row.Value
+			}
+			require.Equal(t, tc.want, values)
+		})
+	}
+	t.Run("aggregate_alias_scope", func(t *testing.T) {
+		var out struct{ Total int }
+		qb := generated.Reserved.Query().Scope(func(tx *gorm.DB) *gorm.DB {
+			return tx.Select("SUM(?) AS ?", column, clause.Column{Name: "total"})
+		})
+		err := qb.Apply(d.Model(&model.Reserved{})).Scan(&out).Error
+		require.NoError(t, err)
+		require.Equal(t, 5, out.Total)
+	})
+	t.Run("pluck", func(t *testing.T) {
+		var values []int
+		err := repo.New[model.Reserved](db.NewClient(d)).Pluck(context.Background(), generated.Reserved.Query().Order(query.RawFragment("id ASC")), generated.Reserved.Value, &values)
+		require.NoError(t, err)
+		require.Equal(t, []int{2, 3}, values)
+	})
+	t.Run("distinct_count_scope", func(t *testing.T) {
+		require.NoError(t, d.Create(&model.Reserved{Value: 2}).Error)
+		qb := generated.Reserved.Query().Scope(func(tx *gorm.DB) *gorm.DB {
+			return tx.Distinct(column.Name)
+		})
+		n, err := repo.New[model.Reserved](db.NewClient(d)).Count(context.Background(), qb)
+		require.NoError(t, err)
+		require.EqualValues(t, 2, n)
+	})
+}

@@ -14,7 +14,7 @@
 - 📦 **开箱即用的泛型仓储** —— 一行代码即可拥有完整 CRUD：`repo.BaseRepository[T]`。
 - 🎯 **告别臃肿的 Repository** —— 用 `query.Builder` 动态组合查询条件，不再为每个业务场景编写 `FindByXxx`。
 - 🔄 **隐式上下文事务** —— 通过 `context.Context` 传递事务，Service 与 Repo 层与 `*gorm.DB` 解耦。
-- 🧊 **不可变、并发只读安全的 Builder** —— 每次链式调用都返回新的 Builder，派生查询互不影响。
+- 🧊 **不可变的 Builder** —— 链式调用不修改原对象，空操作可以返回原对象。并发复用条件见 [Query Builder](docs/zh/query-builder.md)。
 
 ## 📦 安装
 
@@ -216,6 +216,8 @@ make tidy
 make generate
 make test
 ```
+
+`make test` 开启竞态检测，包括子进程执行的生成代码消费端测试。`make test-contract` 按随机顺序重复运行公开能力组合测试。CI 的 `coverage.out` 仅统计父测试进程，不合并消费端子进程的执行数据，也不设置覆盖率门槛。
 
 > 修改 `README_CN.md` 时请同步更新 `README.md`，反之亦然。
 

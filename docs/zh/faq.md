@@ -6,7 +6,7 @@
 
 ## 2. 为什么 Builder 链式后原对象没变？
 
-`Builder` 设计为**不可变**：每次 `Where/Or/Select/...` 都返回新的 Builder，原对象与已派生的 Builder 互不影响，可在多个 goroutine 并发只读。详见 [Query Builder](query-builder.md)。
+`Builder` 的链式调用不修改原对象，空操作可以返回原对象。并发复用要求自定义 Condition、Scope 支持并发调用，并由调用方同步引用参数和闭包捕获状态的修改。详见 [Query Builder](query-builder.md)。
 
 ## 3. 多级 Preload 怎么写？
 

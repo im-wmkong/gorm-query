@@ -15,8 +15,10 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 
+	"github.com/im-wmkong/gorm-query/internal/codegen"
 	"github.com/im-wmkong/gorm-query/internal/fsx"
 	"github.com/im-wmkong/gorm-query/internal/reflectx"
 	"github.com/im-wmkong/gorm-query/internal/slicex"
@@ -69,25 +71,38 @@ func (g *Generator) Generate(models ...any) error {
 		return err
 	}
 
-	if err := g.checkOutputDir(pkgName); err != nil {
-		return err
-	}
-
 	g.cfg.logger.Info("generating schema for %d model(s)", len(models))
 
 	schemas, err := g.schemas(models)
 	if err != nil {
 		return err
 	}
+	if err := g.checkOutputNames(schemas); err != nil {
+		return err
+	}
 
+	type output struct {
+		filename string
+		content  []byte
+	}
+	outputs := make([]output, 0, len(schemas))
 	for _, sch := range schemas {
 		content, err := newRenderer(g.cfg, sch, pkgName).Render()
 		if err != nil {
 			return err
 		}
 
-		filename := filepath.Join(g.cfg.outputDir, g.outputFile(sch))
-		if err := g.writeFile(filename, content); err != nil {
+		outputs = append(outputs, output{
+			filename: filepath.Join(g.cfg.outputDir, g.outputFile(sch)),
+			content:  content,
+		})
+	}
+
+	if err := g.checkOutputDir(pkgName); err != nil {
+		return err
+	}
+	for _, output := range outputs {
+		if err := g.writeFile(output.filename, output.content); err != nil {
 			return err
 		}
 	}
@@ -106,17 +121,17 @@ func (g *Generator) checkSamePackage(models []any) error {
 	if len(models) <= 1 {
 		return nil
 	}
-	pkgName, ok := reflectx.PackageName(models[0])
-	if !ok {
+	pkgPath := reflectx.UnwrapPtr(reflect.TypeOf(models[0])).PkgPath()
+	if pkgPath == "" {
 		return fmt.Errorf("model %T has no package path (anonymous or built-in types are not supported)", models[0])
 	}
 	for _, model := range models[1:] {
-		currentPkg, ok := reflectx.PackageName(model)
-		if !ok {
+		currentPkg := reflectx.UnwrapPtr(reflect.TypeOf(model)).PkgPath()
+		if currentPkg == "" {
 			return fmt.Errorf("model %T has no package path (anonymous or built-in types are not supported)", model)
 		}
-		if currentPkg != pkgName {
-			return fmt.Errorf("all models must be in the same package, but found %q and %q", pkgName, currentPkg)
+		if currentPkg != pkgPath {
+			return fmt.Errorf("all models must be in the same package, but found %q and %q", pkgPath, currentPkg)
 		}
 	}
 	return nil
@@ -124,6 +139,9 @@ func (g *Generator) checkSamePackage(models []any) error {
 
 func (g *Generator) packageName() (string, error) {
 	if g.cfg.packageName != "" {
+		if !token.IsIdentifier(g.cfg.packageName) || g.cfg.packageName == "_" {
+			return "", fmt.Errorf("invalid package name %q", g.cfg.packageName)
+		}
 		g.cfg.logger.Debug("using explicit package name: %s", g.cfg.packageName)
 		return g.cfg.packageName, nil
 	}
@@ -140,11 +158,16 @@ func (g *Generator) packageName() (string, error) {
 }
 
 func (g *Generator) checkOutputDir(pkgName string) error {
-	if err := os.MkdirAll(g.cfg.outputDir, 0755); err != nil {
-		return fmt.Errorf("create output dir failed: %w", err)
+	if !g.cfg.dryRun {
+		if err := os.MkdirAll(g.cfg.outputDir, 0755); err != nil {
+			return fmt.Errorf("create output dir failed: %w", err)
+		}
 	}
 
 	fsPkg, err := fsx.ReadPackageNameFromDir(g.cfg.outputDir)
+	if g.cfg.dryRun && os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("detect package failed: %w", err)
 	}
@@ -156,7 +179,7 @@ func (g *Generator) checkOutputDir(pkgName string) error {
 }
 
 func (g *Generator) schemas(models []any) ([]*schema.Schema, error) {
-	seen := make(map[string]struct{})
+	seen := make(map[reflect.Type]struct{})
 	schemaCache := &sync.Map{}
 	schemas := make([]*schema.Schema, 0, len(models))
 
@@ -176,12 +199,12 @@ func (g *Generator) schemas(models []any) ([]*schema.Schema, error) {
 			continue
 		}
 
-		// Deduplicate by model name.
-		if _, ok := seen[sch.Name]; ok {
+		// Deduplicate by complete model identity.
+		if _, ok := seen[sch.ModelType]; ok {
 			g.cfg.logger.Warn("skipping duplicate model: %s", sch.Name)
 			continue
 		}
-		seen[sch.Name] = struct{}{}
+		seen[sch.ModelType] = struct{}{}
 
 		g.cfg.logger.Debug("parsed model %s: %d field(s)", sch.Name, len(sch.Fields))
 		schemas = append(schemas, sch)
@@ -192,6 +215,30 @@ func (g *Generator) schemas(models []any) ([]*schema.Schema, error) {
 
 func (g *Generator) outputFile(sch *schema.Schema) string {
 	return g.cfg.namingStrategy.ColumnName("", sch.Name) + "_gen.go"
+}
+
+// checkOutputNames rejects collisions before any source file is rendered or written.
+func (g *Generator) checkOutputNames(schemas []*schema.Schema) error {
+	files := make(map[string]string, len(schemas))
+	identifiers := make(map[string]string, len(schemas)*2)
+	for _, sch := range schemas {
+		filename := g.outputFile(sch)
+		if previous, ok := files[filename]; ok {
+			return fmt.Errorf("output file collision %q: %s and %s", filename, previous, sch.Name)
+		}
+		files[filename] = sch.Name
+
+		for _, name := range []string{sch.Name, codegen.UnexportName(sch.Name)} {
+			if !token.IsIdentifier(name) || name == "_" {
+				return fmt.Errorf("invalid generated identifier %q for %s", name, sch.Name)
+			}
+			if previous, ok := identifiers[name]; ok {
+				return fmt.Errorf("generated identifier collision %q: %s and %s", name, previous, sch.Name)
+			}
+			identifiers[name] = sch.Name
+		}
+	}
+	return nil
 }
 
 func (g *Generator) writeFile(filename string, content []byte) error {

@@ -46,7 +46,7 @@ func (s *UserService) Register(ctx context.Context, u *model.User, p *model.Prof
         if err := s.users.Create(txCtx, u); err != nil {
             return err
         }
-        // 同一个 txCtx 自动复用同一个 tx
+        // 同一个 Client 的仓储通过 txCtx 复用事务
         return s.profiles.Create(txCtx, p)
     })
 }
@@ -54,16 +54,16 @@ func (s *UserService) Register(ctx context.Context, u *model.User, p *model.Prof
 
 ## 3. 传播契约
 
-`db.Client` 内部使用一个**私有**的 ctx key，外部无法手动构造事务 ctx：
+`db.Client` 内部使用按 Client 实例区分的**私有** ctx key，外部无法手动构造事务 ctx：
 
 - 必须经由 `Transactor.Transaction(...)` 进入。
-- 进入后 fn 拿到的 `txCtx` 已经携带事务连接，其下游所有 `DBProvider.DB(txCtx)` / `Repository.*(txCtx, ...)` 都会复用同一个 `*gorm.DB`。
+- 进入后 fn 拿到的 `txCtx` 已经携带事务连接，下游通过同一个 Client 的 `DBProvider.DB(txCtx)` / `Repository.*(txCtx, ...)` 会复用同一个 `*gorm.DB`。
 - fn 返回 `error` → GORM 自动回滚；返回 `nil` → 提交。
 - 如果 ctx 中**不带**事务 key，`DB(ctx)` 直接走 `db.WithContext(ctx)`，这就是非事务的常规调用。
 
 ## 4. 嵌套事务
 
-`Transaction` 内部直接复用 GORM 的事务能力：在外层事务的 `txCtx` 上再次调用 `Transaction(...)` 时，GORM 会基于 SAVEPOINT 实现"嵌套事务"。内层失败只会回滚到 SAVEPOINT，不会终止外层。
+`Transaction` 内部直接复用 GORM 的事务能力：在外层事务的 `txCtx` 上通过同一个 Client 再次调用 `Transaction(...)` 时，GORM 会基于 SAVEPOINT 实现"嵌套事务"。内层失败只会回滚到 SAVEPOINT，不会终止外层。
 
 ```go
 client.Transaction(ctx, func(outer context.Context) error {
@@ -98,3 +98,9 @@ err := r.DB(ctx).
 ```
 
 事务隔离仍然成立。
+
+## 7. 多 Client 与异常结束
+
+不同 Client 各自查找自己的事务，即使底层 DB 相同也不会隐式共享。A → B → A 的 Context 链保留两者的事务；B 提交或回滚不会改变 A 的连接归属。需要多个仓储共同提交时，注入同一个 Client。跨数据库不提供原子提交。
+
+回调 panic 由 GORM 回滚后继续传播。Context 在事务中被取消时，后续操作和提交会失败；不要在回调结束后继续使用事务 Context。

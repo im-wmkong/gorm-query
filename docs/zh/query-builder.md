@@ -1,6 +1,6 @@
 # Query Builder
 
-`query.Builder[T]` 是一个**不可变（immutable）**、可链式调用的 SQL 构建器。每一次 `Where / Or / Select / ...` 都会返回一个**新的** Builder，原对象保持不变。
+`query.Builder[T]` 是一个**不可变（immutable）**、可链式调用的 SQL 构建器。链式调用保留原 Builder 的行为，派生查询互不影响；空操作可以返回原对象。
 
 ```go
 base   := schema.User.Query().Where(schema.User.Status.Eq(1))
@@ -8,7 +8,7 @@ adults := base.Where(schema.User.Age.Gte(18)) // 不会修改 base
 minors := base.Where(schema.User.Age.Lt(18))  // 不会修改 base
 ```
 
-因此一个完成构建的 Builder 也可以在多个 goroutine 间并发只读。
+完成构建的 Builder 可以并发复用，前提是自定义 Condition、Scope 支持并发调用，且引用的可变参数与闭包捕获状态由调用方同步。
 
 ## 1. 创建 Builder
 
@@ -130,7 +130,7 @@ schema.User.Query().Preload(
 // 携带过滤条件的 Preload
 schema.User.Query().Preload(
     schema.User.Profile,
-    schema.Profile.City.Eq("SF"),
+    schema.Profile.Bio.Eq("SF"),
 )
 ```
 
@@ -140,10 +140,10 @@ schema.User.Query().Preload(
 schema.User.Query().Joins(schema.User.Profile)        // LEFT JOIN
 schema.User.Query().InnerJoins(schema.User.Profile)   // INNER JOIN
 
-// 携带 ON 条件
+// ON 条件使用 GORM 的关联别名
 schema.User.Query().Joins(
     schema.User.Profile,
-    schema.Profile.City.Eq("SF"),
+    schema.Profile.Bio.WithTable("Profile").Eq("SF"),
 )
 ```
 
@@ -177,3 +177,22 @@ err := qb.Apply(db.Model(&model.User{})).Find(&users).Error
 ```
 
 > 💡 推荐把 Builder 直接交给 `repo.Repository[T]`，由 repo 自动处理 `Model(...)`，参见 [Repository](repository.md)。
+
+## 11. 组合行为与 SQL 片段边界
+
+Builder 在接收 IN/NOT IN 值、Or/Not/关联条件、Scope 列表和 Having 参数时复制容器。修改原切片不会改变已构建查询；指针所指对象、Map 和用户闭包的捕获状态不做深拷贝，调用方应保证自定义函数并发安全。空操作可能返回原 Builder，保证的是行为不被修改，而非指针一定不同。
+
+`SQLFragment.SQL()` 返回原样 SQL 文本，Select、Order、Group 等入口在接收时读取该文本，再交给 GORM。列的 As/Asc/Desc/Distinct 和聚合辅助方法只拼接 SQL，不自动处理不同方言的标识符引用。
+
+`WithTable(alias)` 返回同一种列类型，仍可调用 Gt/Like/Set 等方法。JOIN 条件需要使用 GORM 的关联别名，例如 `schema.Profile.Bio.WithTable("Profile").Eq("SF")`；Preload 条件使用目标物理表。Builder 将关联路径和条件直接交给 GORM，不推算别名、不改写列名、不补父级 JOIN。多级 JOIN 如需独立的父子条件，应显式分别调用 Joins；复杂关联可通过 Scope 使用 GORM。
+
+`AggFragment` 保持字符串类型，`AggFragment("SUM(age)")`、`string(agg)`、`column.Sum().As("total")` 均保持原有用法。需要处理保留字或特殊 SQL 表达式时，通过 Scope 使用 GORM 原生能力，例如：
+
+```go
+qb := schema.User.Query().Scope(func(db *gorm.DB) *gorm.DB {
+    column := clause.Column{Table: schema.User.Age.Table(), Name: schema.User.Age.Name()}
+    return db.Select("SUM(?) AS ?", column, clause.Column{Name: "total"})
+})
+```
+
+这里由 GORM 对 `clause.Column` 进行方言引用；SQL 片段层不增加渲染协议。

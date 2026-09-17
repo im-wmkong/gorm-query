@@ -1,0 +1,27 @@
+package consumer
+
+import (
+	"testing"
+
+	generated "example.com/consumer/schema"
+	"github.com/im-wmkong/gorm-query/test/model"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
+)
+
+func TestGeneratedQuery(t *testing.T) {
+	d, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{NamingStrategy: NAMING_STRATEGY})
+	require.NoError(t, err)
+	sqlDB, err := d.DB()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+	require.NoError(t, d.AutoMigrate(&model.Explicit{}))
+	require.NoError(t, d.Create(&model.Explicit{Name: "first"}).Error)
+	var out []model.Explicit
+	err = generated.Explicit.Query().Where(generated.Explicit.Name.Eq("first")).Apply(d.Model(&model.Explicit{})).Find(&out).Error
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	require.Equal(t, "first", out[0].Name)
+}

@@ -1,6 +1,6 @@
 # Query Builder
 
-`query.Builder[T]` is an **immutable**, chainable SQL builder. Every `Where / Or / Select / ...` call returns a **new** Builder, leaving the receiver untouched.
+`query.Builder[T]` is an **immutable**, chainable SQL builder. Chained calls leave the receiver unchanged; no-op calls may return the original Builder.
 
 ```go
 base   := schema.User.Query().Where(schema.User.Status.Eq(1))
@@ -8,7 +8,7 @@ adults := base.Where(schema.User.Age.Gte(18)) // does NOT mutate base
 minors := base.Where(schema.User.Age.Lt(18))  // does NOT mutate base
 ```
 
-Because the receiver is never mutated, a fully-built Builder is also safe to read concurrently from multiple goroutines.
+A constructed Builder can be reused concurrently when custom Conditions and Scopes support concurrent calls and callers synchronize changes to referenced values and captured state.
 
 ## 1. Creating a Builder
 
@@ -130,7 +130,7 @@ schema.User.Query().Preload(
 // Conditional preload
 schema.User.Query().Preload(
     schema.User.Profile,
-    schema.Profile.City.Eq("SF"),
+    schema.Profile.Bio.Eq("SF"),
 )
 ```
 
@@ -140,10 +140,10 @@ schema.User.Query().Preload(
 schema.User.Query().Joins(schema.User.Profile)        // LEFT JOIN
 schema.User.Query().InnerJoins(schema.User.Profile)   // INNER JOIN
 
-// With ON conditions
+// ON conditions use GORM's association alias
 schema.User.Query().Joins(
     schema.User.Profile,
-    schema.Profile.City.Eq("SF"),
+    schema.Profile.Bio.WithTable("Profile").Eq("SF"),
 )
 ```
 
@@ -177,3 +177,22 @@ err := qb.Apply(db.Model(&model.User{})).Find(&users).Error
 ```
 
 > 💡 Prefer handing the Builder directly to `repo.Repository[T]`; the repo handles `Model(...)` for you. See [Repository](repository.md).
+
+## 11. Composition and SQL fragment boundaries
+
+Builders snapshot the input containers for IN/NOT IN, Or/Not/association conditions, Scope lists and Having arguments. Mutating the original slice does not change a built query. Pointed-to objects, maps and captured closure state are not deep-copied; callers own the concurrency safety of custom functions. Empty operations may return the original Builder: immutability guarantees behavior, not pointer identity.
+
+`SQLFragment.SQL()` returns raw SQL text. Select, Order and Group evaluate it when accepting the fragment and pass the text to GORM. Column As/Asc/Desc/Distinct and aggregate helpers only compose SQL text; they do not automatically quote identifiers for different dialects.
+
+`WithTable(alias)` retains the concrete column type and its operators. JOIN conditions must use GORM's association alias, for example `schema.Profile.Bio.WithTable("Profile").Eq("SF")`; Preload conditions use the target physical table. The Builder passes association paths and conditions directly to GORM without inferring aliases, rewriting columns or adding parent JOINs. Call Joins separately when a nested JOIN needs independent parent and child conditions; use GORM through Scope for complex associations.
+
+`AggFragment` remains a string type. `AggFragment("SUM(age)")`, `string(agg)` and `column.Sum().As("total")` retain their existing behavior. Use native GORM expressions through Scope for reserved identifiers or special SQL expressions:
+
+```go
+qb := schema.User.Query().Scope(func(db *gorm.DB) *gorm.DB {
+    column := clause.Column{Table: schema.User.Age.Table(), Name: schema.User.Age.Name()}
+    return db.Select("SUM(?) AS ?", column, clause.Column{Name: "total"})
+})
+```
+
+GORM quotes `clause.Column` using its dialect. The SQL fragment layer adds no rendering protocol.

@@ -54,16 +54,16 @@ func (s *UserService) Register(ctx context.Context, u *model.User, p *model.Prof
 
 ## 3. Propagation contract
 
-`db.Client` uses a **private** ctx key, so external code cannot fabricate a transaction context:
+`db.Client` uses a **private** ctx key scoped to each Client instance, so external code cannot fabricate a transaction context:
 
 - You must enter via `Transactor.Transaction(...)`.
-- The `txCtx` passed to `fn` carries the transaction; every `DBProvider.DB(txCtx)` / `Repository.*(txCtx, ...)` downstream reuses the same `*gorm.DB`.
+- The `txCtx` passed to `fn` carries the transaction; downstream `DBProvider.DB(txCtx)` / `Repository.*(txCtx, ...)` calls through that same Client reuse the same `*gorm.DB`.
 - `fn` returns `error` → GORM rolls back; returns `nil` → commits.
 - If a ctx **does not** carry the transaction key, `DB(ctx)` falls back to `db.WithContext(ctx)`—plain non-transactional access.
 
 ## 4. Nested transactions
 
-`Transaction` builds on GORM's transaction support: calling `Transaction(...)` again with an outer `txCtx` opens a SAVEPOINT-based nested transaction. Failure inside the inner block rolls back to the SAVEPOINT only.
+`Transaction` builds on GORM's transaction support: calling `Transaction(...)` on the same Client again with an outer `txCtx` opens a SAVEPOINT-based nested transaction. Failure inside the inner block rolls back to the SAVEPOINT only.
 
 ```go
 client.Transaction(ctx, func(outer context.Context) error {
@@ -98,3 +98,9 @@ err := r.DB(ctx).
 ```
 
 The transactional isolation is preserved.
+
+## 7. Multiple Clients and abnormal completion
+
+Each Client resolves its own transaction, even when two Clients wrap the same base DB. An A → B → A context chain preserves both transactions. B committing or rolling back does not change A's connection ownership. Inject the same Client when repositories must share a transaction. Cross-database atomic commits are not provided.
+
+GORM rolls back a panicking callback and propagates the panic. Cancellation during a transaction causes subsequent operations and commit to fail. Do not reuse transaction contexts after the callback returns.

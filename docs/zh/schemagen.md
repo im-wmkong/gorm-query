@@ -29,7 +29,7 @@ go run cmd/gen/main.go
 默认行为：
 - 输出目录：`./schema`
 - 包名：从输出目录名推断（如 `schema` → `package schema`）
-- 命名策略：`schema.NamingStrategy{SingularTable: true}`
+- 命名策略：`schema.NamingStrategy{}`
 - 文件名：模型 `User` → `user_gen.go`
 
 ## 2. 配合 `go generate`
@@ -51,7 +51,7 @@ go generate ./...
 | :--- | :--- | :--- |
 | `WithOutputDir(dir)` | 输出目录 | `"schema"` |
 | `WithPackageName(name)` | 显式指定包名 | 从输出目录推断 |
-| `WithNamingStrategy(ns)` | GORM 命名策略 | `{SingularTable: true}` |
+| `WithNamingStrategy(ns)` | GORM 命名策略 | `{}` |
 | `WithDryRun(true)` | 校验模式：不写文件，只检查现有文件是否与新生成内容一致 | `false` |
 | `WithLogger(logger)` | 自定义日志；传 `nil` 等价于 `NopLogger()` | `DefaultLogger()` |
 
@@ -87,11 +87,11 @@ g := schemagen.New(
 
 ## 6. 限制与陷阱
 
-- **同包要求**：传给一次 `Generate(...)` 的所有模型必须位于同一 Go 包，否则会返回 "all models must be in the same package"。
+- **同包要求**：传给一次 `Generate(...)` 的所有模型必须位于同一完整导入路径的 Go 包，否则会返回 "all models must be in the same package"。
 - **匿名 / 内置类型**：未导出或匿名结构体会被跳过并打印 warning。
 - **DBName 为空**：GORM 解析后 `DBName == ""` 的字段（一般是显式 `gorm:"-"`）会跳过。
-- **包名一致性**：若 `outputDir` 已经包含 Go 文件且其包名与目标包名不一致，会直接报错；遇到此情况显式 `WithPackageName(...)` 即可。
-- **dry-run**：仅与现有文件做字节级比对；CI 中可作为"是否忘记 regen"的检查。
+- **包名一致性**：若 `outputDir` 已经包含 Go 文件且其包名与目标包名不一致，会直接报错；`WithPackageName(...)` 必须与现有包一致，不能覆盖包冲突。
+- **dry-run**：仅与现有文件做字节级比对，不创建目录或文件；CI 中可作为"是否忘记 regen"的检查。
 
 ## 7. 生成结果示例
 
@@ -125,3 +125,11 @@ func (s *user) Query() *query.Builder[model.User] {
 ```
 
 完整可运行示例：[`example/cmd/schemagen/main.go`](../../example/cmd/schemagen/main.go) 与 [`example/model/schema/`](../../example/model/schema/)。
+
+## 8. 命名与生成校验
+
+默认表名与 GORM 默认复数策略一致；使用单数表名时，在生成时显式配置 `WithNamingStrategy(schema.NamingStrategy{SingularTable: true})`。生成与运行时的自定义策略必须一致，模型的 `TableName()` 优先。
+
+普通字段保持原有成员名。嵌入字段重名时逐步增加字段路径，例如 `Billing.City` / `Shipping.City` 生成 `BillingCity` / `ShippingCity`。数据库列名保持 GORM 的 DBName；仍无法消歧时返回包含模型和字段路径的错误。
+
+生成器在写入前校验完整包身份、输出文件名、生成标识符和成员冲突，并完成全部渲染。可提前检测的错误不会改写已有文件；写入期间的磁盘错误不具备多文件原子回滚保证。

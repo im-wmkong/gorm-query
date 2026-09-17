@@ -1,0 +1,91 @@
+package consumer
+
+import (
+	"context"
+	"reflect"
+	"testing"
+
+	generated "example.com/consumer/schema"
+	"github.com/im-wmkong/gorm-query/db"
+	"github.com/im-wmkong/gorm-query/repo"
+	"github.com/im-wmkong/gorm-query/test/model"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
+)
+
+// Embedded columns must remain independently accessible after generation.
+func TestGeneratedQuery(t *testing.T) {
+	// Check both database columns survive generation.
+	columns := map[string]bool{}
+	value := reflect.ValueOf(generated.Shipment)
+	for i := 0; i < value.NumField(); i++ {
+		if column, ok := value.Field(i).Interface().(interface{ Name() string }); ok {
+			columns[column.Name()] = true
+		}
+	}
+	require.True(t, columns["billing_city"])
+	require.True(t, columns["shipping_city"])
+	d, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{NamingStrategy: NAMING_STRATEGY})
+	require.NoError(t, err)
+	sqlDB, err := d.DB()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+	require.NoError(t, d.AutoMigrate(&model.Shipment{}))
+	require.NoError(t, d.Create(&model.Shipment{
+		Billing: model.Address{City: "SF"}, Shipping: model.Address{City: "NY"},
+	}).Error)
+	var out []model.Shipment
+	require.NoError(t, generated.Shipment.Query().Apply(d.Model(&model.Shipment{})).Find(&out).Error)
+	require.Len(t, out, 1)
+	require.Equal(t, "SF", out[0].Billing.City)
+	require.Equal(t, "NY", out[0].Shipping.City)
+	require.Equal(t, generated.Shipment.BillingCity.Name(), generated.ReorderedShipment.BillingCity.Name())
+	require.Equal(t, generated.Shipment.ShippingCity.Name(), generated.ReorderedShipment.ShippingCity.Name())
+	require.Equal(t, "city", generated.CityCollision.City.Name())
+	require.Equal(t, "billing_city", generated.CityCollision.BillingCity.Name())
+	r := repo.New[model.Shipment](db.NewClient(d))
+	ctx := context.Background()
+	qb := generated.Shipment.Query().Where(generated.Shipment.BillingCity.Eq("SF"), generated.Shipment.ShippingCity.Eq("NY"))
+	n, err := r.Update(ctx, qb, generated.Shipment.BillingCity.Set("LA"))
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
+	row, err := r.First(ctx, generated.Shipment.Query().Where(generated.Shipment.BillingCity.Eq("LA")))
+	require.NoError(t, err)
+	require.Equal(t, "NY", row.Shipping.City)
+}
+
+func TestGeneratedShadowedColumn(t *testing.T) {
+	var columns []string
+	value := reflect.ValueOf(generated.CityOverride)
+	for i := 0; i < value.NumField(); i++ {
+		if column, ok := value.Field(i).Interface().(interface{ Name() string }); ok {
+			columns = append(columns, column.Name())
+		}
+	}
+	require.ElementsMatch(t, []string{"id", "city"}, columns, "each database column must appear once")
+
+	d, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{NamingStrategy: NAMING_STRATEGY})
+	require.NoError(t, err)
+	sqlDB, err := d.DB()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+	require.NoError(t, d.AutoMigrate(&model.CityOverride{}))
+	r := repo.New[model.CityOverride](db.NewClient(d))
+	ctx := context.Background()
+	require.NoError(t, r.Create(ctx, &model.CityOverride{Address: model.Address{City: "ignored"}, City: "SF"}))
+	qb := generated.CityOverride.Query().Where(generated.CityOverride.City.Eq("SF"))
+	row, err := r.First(ctx, qb)
+	require.NoError(t, err)
+	require.Equal(t, "SF", row.City)
+	require.Empty(t, row.Address.City)
+
+	n, err := r.Update(ctx, qb, generated.CityOverride.City.Set("LA"))
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
+	row, err = r.First(ctx, generated.CityOverride.Query().Where(generated.CityOverride.City.Eq("LA")))
+	require.NoError(t, err)
+	require.Equal(t, "LA", row.City)
+	require.Empty(t, row.Address.City)
+}

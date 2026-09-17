@@ -14,11 +14,9 @@ type config struct {
 
 func defaultConfig() config {
 	return config{
-		outputDir: "schema",
-		namingStrategy: schema.NamingStrategy{
-			SingularTable: true,
-		},
-		logger: DefaultLogger(),
+		outputDir:      "schema",
+		namingStrategy: schema.NamingStrategy{},
+		logger:         DefaultLogger(),
 	}
 }
 

@@ -31,24 +31,6 @@ func openTestDB(t *testing.T) *gorm.DB {
 	return gormDB
 }
 
-// TestDB_WithoutTransaction verifies that DB(ctx) returns a normal connection without a transaction.
-func TestDB_WithoutTransaction(t *testing.T) {
-	gormDB := openTestDB(t)
-	client := NewClient(gormDB)
-	ctx := context.Background()
-
-	session := client.DB(ctx)
-	require.NotNil(t, session)
-
-	// Basic CRUD should work.
-	err := session.Create(&user{UserName: "test", Email: "t@t.com", Age: 1}).Error
-	require.NoError(t, err)
-
-	var count int64
-	require.NoError(t, session.Model(&user{}).Count(&count).Error)
-	assert.Equal(t, int64(1), count)
-}
-
 // TestDB_InsideTransaction verifies that DB(ctx) returns a transactional connection inside Transaction.
 func TestDB_InsideTransaction(t *testing.T) {
 	gormDB := openTestDB(t)
@@ -78,7 +60,9 @@ func TestDB_TransactionRollback(t *testing.T) {
 	expectedErr := errors.New("rollback me")
 	err := client.Transaction(ctx, func(txCtx context.Context) error {
 		txDB := client.DB(txCtx)
-		_ = txDB.Create(&user{UserName: "ghost", Email: "g@t.com", Age: 1}).Error
+		if err := txDB.Create(&user{UserName: "ghost", Email: "g@t.com", Age: 1}).Error; err != nil {
+			return err
+		}
 		return expectedErr
 	})
 	require.ErrorIs(t, err, expectedErr)
@@ -94,16 +78,21 @@ func TestDB_NestedTransaction(t *testing.T) {
 	gormDB := openTestDB(t)
 	client := NewClient(gormDB)
 	ctx := context.Background()
+	innerFailure := errors.New("inner fail")
 
 	err := client.Transaction(ctx, func(outerCtx context.Context) error {
-		_ = client.DB(outerCtx).Create(&user{UserName: "outer", Email: "o@t.com", Age: 1}).Error
+		if err := client.DB(outerCtx).Create(&user{UserName: "outer", Email: "o@t.com", Age: 1}).Error; err != nil {
+			return err
+		}
 
 		// Inner transaction fails and rolls back.
 		innerErr := client.Transaction(outerCtx, func(innerCtx context.Context) error {
-			_ = client.DB(innerCtx).Create(&user{UserName: "inner", Email: "i@t.com", Age: 1}).Error
-			return errors.New("inner fail")
+			if err := client.DB(innerCtx).Create(&user{UserName: "inner", Email: "i@t.com", Age: 1}).Error; err != nil {
+				return err
+			}
+			return innerFailure
 		})
-		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, innerFailure)
 
 		return nil // Outer transaction commits.
 	})
@@ -113,21 +102,4 @@ func TestDB_NestedTransaction(t *testing.T) {
 	var count int64
 	require.NoError(t, client.DB(ctx).Model(&user{}).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
-}
-
-// TestDB_ContextValueNotGormDB verifies the fallback when ctx contains a txKey value of a wrong type.
-func TestDB_ContextValueNotGormDB(t *testing.T) {
-	gormDB := openTestDB(t)
-	client := NewClient(gormDB)
-
-	// We cannot set txKey directly (unexported), but we can validate that a normal context
-	// will not accidentally trigger transactional behavior.
-	// In real usage, only Transaction sets txKey.
-	ctx := context.WithValue(context.Background(), struct{ name string }{"unrelated"}, "value")
-	session := client.DB(ctx)
-	require.NotNil(t, session)
-
-	// Should return a normal connection and must not panic.
-	var count int64
-	require.NoError(t, session.Model(&user{}).Count(&count).Error)
 }

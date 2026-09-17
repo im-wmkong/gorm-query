@@ -87,17 +87,6 @@ func TestBaseRepository_CRUD(t *testing.T) {
 	assert.Equal(t, "Charlie", last.UserName)
 }
 
-func TestBaseRepository_NotFoundReturnsNilEntity(t *testing.T) {
-	gormDB := openRepoTestDB(t)
-	client := db.NewClient(gormDB)
-	r := New[user](client)
-	ctx := context.Background()
-
-	got, err := r.Take(ctx, query.New[user]().Where(userSchema.UserName.Eq("nobody")))
-	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	require.Nil(t, got)
-}
-
 func TestBaseRepository_Update(t *testing.T) {
 	gormDB := openRepoTestDB(t)
 	client := db.NewClient(gormDB)
@@ -162,16 +151,6 @@ func TestBaseRepository_Delete(t *testing.T) {
 	count, err := r.Count(ctx, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), count)
-}
-
-func TestBaseRepository_DeleteWithoutWhereIsRejectedByGorm(t *testing.T) {
-	gormDB := openRepoTestDB(t)
-	client := db.NewClient(gormDB)
-	r := New[user](client)
-	ctx := context.Background()
-
-	_, err := r.Delete(ctx, query.New[user]())
-	require.ErrorIs(t, err, gorm.ErrMissingWhereClause)
 }
 
 func TestBaseRepository_Pluck(t *testing.T) {
@@ -275,19 +254,23 @@ func TestBaseRepository_FirstTakeLast_SuccessAndNotFound(t *testing.T) {
 
 	seedUsers(t, r, ctx)
 
-	// Take success
-	got, err := r.Take(ctx, query.New[user]().Where(userSchema.UserName.Eq("Bob")))
-	require.NoError(t, err)
-	require.NotNil(t, got)
-	assert.Equal(t, "Bob", got.UserName)
+	for _, tc := range []struct {
+		name string
+		find func(context.Context, *query.Builder[user]) (*user, error)
+	}{
+		{"first", r.First},
+		{"take", r.Take},
+		{"last", r.Last},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.find(ctx, query.New[user]().Where(userSchema.UserName.Eq("Bob")))
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, "Bob", got.UserName)
 
-	// First not found
-	gotFirst, err := r.First(ctx, query.New[user]().Where(userSchema.UserName.Eq("nobody")))
-	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	require.Nil(t, gotFirst)
-
-	// Last not found
-	gotLast, err := r.Last(ctx, query.New[user]().Where(userSchema.UserName.Eq("nobody")))
-	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	require.Nil(t, gotLast)
+			got, err = tc.find(ctx, query.New[user]().Where(userSchema.UserName.Eq("nobody")))
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			require.Nil(t, got)
+		})
+	}
 }

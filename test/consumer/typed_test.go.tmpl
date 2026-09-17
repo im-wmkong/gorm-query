@@ -1,0 +1,64 @@
+package consumer
+
+import (
+	"context"
+	"database/sql"
+	"testing"
+	"time"
+
+	generated "example.com/consumer/schema"
+	"github.com/im-wmkong/gorm-query/db"
+	"github.com/im-wmkong/gorm-query/repo"
+	"github.com/im-wmkong/gorm-query/test/model"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
+)
+
+func TestGeneratedColumnTypes(t *testing.T) {
+	d, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{NamingStrategy: NAMING_STRATEGY})
+	require.NoError(t, err)
+	sqlDB, err := d.DB()
+	require.NoError(t, err)
+	defer sqlDB.Close()
+	require.NoError(t, d.AutoMigrate(&model.TypedRecord{}))
+	at := time.Unix(1700000000, 0).UTC()
+	optional := 7
+	note := sql.NullString{String: "note", Valid: true}
+	r := repo.New[model.TypedRecord](db.NewClient(d))
+	ctx := context.Background()
+	require.NoError(t, r.Create(ctx, &model.TypedRecord{
+		Label: model.Label("ready"), Amount: model.Amount(42),
+		Active: true, At: at, Optional: &optional, Note: note,
+	}))
+	require.NoError(t, r.Create(ctx, &model.TypedRecord{Label: model.Label("other")}))
+
+	qb := generated.TypedRecord.Query().Where(
+		generated.TypedRecord.Label.Eq(model.Label("ready")),
+		generated.TypedRecord.Amount.Gt(model.Amount(40)),
+		generated.TypedRecord.Active.IsTrue(),
+		generated.TypedRecord.At.Gte(at),
+		generated.TypedRecord.Optional.Eq(7),
+		generated.TypedRecord.Note.Eq(note),
+	)
+	rows, err := r.Find(ctx, qb)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, model.Label("ready"), rows[0].Label)
+
+	n, err := r.Update(ctx, qb,
+		generated.TypedRecord.Label.Set(model.Label("done")),
+		generated.TypedRecord.Amount.Set(model.Amount(0)),
+		generated.TypedRecord.Active.Set(false),
+		generated.TypedRecord.Note.Set(sql.NullString{}),
+	)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
+	row, err := r.First(ctx, generated.TypedRecord.Query().Where(generated.TypedRecord.ID.Eq(rows[0].ID)))
+	require.NoError(t, err)
+	require.Equal(t, model.Label("done"), row.Label)
+	require.Zero(t, row.Amount)
+	require.False(t, row.Active)
+	require.False(t, row.Note.Valid)
+}

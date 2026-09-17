@@ -1,4 +1,4 @@
-.PHONY: all tidy generate test lint clean
+.PHONY: all tidy generate check-generated test test-contract lint clean
 
 all: tidy generate test
 
@@ -10,9 +10,16 @@ tidy:
 generate:
 	go generate ./example/...
 
-# 运行所有单元测试，并开启竞态检测
+# 在干净 checkout 中检查已跟踪和未跟踪的生成文件
+check-generated: generate
+	@test -z "$$(git status --porcelain -- example/model/schema)" || { git status --short -- example/model/schema; exit 1; }
+
+# 运行单元测试和公开能力组合测试，并开启竞态检测
 test:
-	go test -v -race ./...
+	go test -race -count=1 ./...
+
+test-contract:
+	go test -race -count=2 -shuffle=on ./test
 
 # 静态检查（与 CI 一致）
 lint:
@@ -26,4 +33,3 @@ lint:
 # 清理可能生成的临时文件或缓存
 clean:
 	go clean -testcache
-	rm -f example/model/*_gen.go

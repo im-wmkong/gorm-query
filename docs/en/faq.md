@@ -6,7 +6,7 @@
 
 ## 2. Why does my Builder reference not change after chaining?
 
-`Builder` is **immutable**: every `Where/Or/Select/...` returns a brand-new Builder; the original and any derived builders are independent and safe to read from multiple goroutines. See [Query Builder](query-builder.md).
+Chained Builder calls leave the receiver unchanged; no-op calls may return it. Concurrent reuse requires custom Conditions and Scopes to support concurrent calls, with callers synchronizing changes to referenced values and captured state. See [Query Builder](query-builder.md).
 
 ## 3. How do I write multi-level Preload?
 

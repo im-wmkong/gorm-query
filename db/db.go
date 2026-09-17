@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
-type txKeyType struct{}
-
-var txKey = txKeyType{}
+type transactionKey struct {
+	client *Client
+}
 
 // DBProvider provides a *gorm.DB bound to the given context.
 type DBProvider interface {
@@ -33,7 +33,7 @@ type Client struct {
 	db *gorm.DB
 }
 
-// NewClient creates a new Client instance. db must not be nil, otherwise it panics.
+// NewClient creates a new Client instance. db must not be nil.
 //
 // Example:
 //
@@ -52,7 +52,7 @@ func NewClient(db *gorm.DB) *Client {
 //	session := client.DB(ctx)
 //	_ = session
 func (c *Client) DB(ctx context.Context) *gorm.DB {
-	v := ctx.Value(txKey)
+	v := ctx.Value(transactionKey{client: c})
 	if v != nil {
 		if tx, ok := v.(*gorm.DB); ok {
 			return tx.WithContext(ctx)
@@ -66,13 +66,13 @@ func (c *Client) DB(ctx context.Context) *gorm.DB {
 // Example:
 //
 //	err := client.Transaction(ctx, func(txCtx context.Context) error {
-//	    // Any repo/db call using txCtx will use the same transaction.
+//	    // Calls through this Client use the same transaction.
 //	    return nil
 //	})
 //	_ = err
 func (c *Client) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return c.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, txKey, tx)
+		txCtx := context.WithValue(ctx, transactionKey{client: c}, tx)
 		return fn(txCtx)
 	})
 }
